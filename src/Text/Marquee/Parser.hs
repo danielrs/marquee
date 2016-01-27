@@ -56,22 +56,20 @@ fenced = do
 parseLinkReference :: Parser Doc
 parseLinkReference = do
   atMostN 3 (char ' ')
-  reference <- between (char '[') (char ']') (skipMany whitespace >> many1 referenceChar)
+  reference <- between (char '[') (char ']') (skipMany whitespace >> many1 linkChar)
   char ':'
 
   skipMany whitespace >> (optional $ lineEnding >> skipMany1 whitespace)
   destination <- many1 printable
 
   skipMany whitespace
-  title <- (parseTitle <|> (lineEnding_ >> skipMany1 whitespace >> parseTitle))
+  title <- option "" $ parseTitle <|> (lineEnding_ >> skipMany1 whitespace >> parseTitle)
 
   return $ linkReference
             reference
             destination
             (if length title > 0 then Just title else Nothing)
-  where referenceChar = (string "\\]" >> return ']') <|> noneOf "]"
-        parseTitle = option "" $  printable >>= \t ->
-                                  manyTill anyChar (lookAhead lineEnding_) >>= return . (:) t
+  where parseTitle = printable >>= \t -> manyTill anyChar (lookAhead lineEnding_) >>= return . (:) t
 
 paragraph :: Parser Doc
 paragraph = do
@@ -103,7 +101,7 @@ flanked open close rules = do
   str <- open
   notFollowedBy whitespace
   xs <- manyTill1 (inline $ rules >> notFollowedBy (string str)) close
-  return $ foldr cons Empty xs
+  return $ foldr (<#>) Empty xs
 
 bold :: Parser () -> Parser Doc
 bold rules = do
@@ -116,6 +114,16 @@ italic rules = do
   xs <- try (flanked (string "*") (string "*") rules)
         <|> flanked (string "_") (string "_") rules
   return $ Italic xs
+
+-- link :: -> Parser Doc
+-- link = do
+--   linkText <- between (char '[') (char ']') linkChar
+
+escapedChar :: Parser Doc
+escapedChar =  notFollowedBy lineEnding >> escaped >>= return . Char
+  where escaped :: Parser Char
+        escaped = char '\\' >> oneOf charCodes
+        charCodes = ['`', '*', '_', '[', ']']
 
 inlineChar :: Parser () -> Parser Doc
 inlineChar rules = notFollowedBy lineEnding >> rules >> anyChar >>= return . Char
@@ -135,12 +143,13 @@ block =
 
 inline :: Parser () -> Parser Doc
 inline rules = do
-  next <- try codespan
+  next <- try escapedChar
+          <|> try codespan
           <|> try (bold rules)
           <|> try (italic rules)
           <|> inlineChar rules
   rest <- many $ inline rules
-  return $ cons next (foldr cons Empty rest)
+  return $ next <#> (foldr (<#>) Empty rest)
 
 parseDoc :: Parser [Doc]
 parseDoc = sepEndBy block lineEnding
@@ -148,7 +157,7 @@ parseDoc = sepEndBy block lineEnding
 renderCST :: String -> Doc
 renderCST input = case parse parseDoc "Markdown" input of
                     Left err -> error $ show err
-                    Right val -> foldr cons Empty val
+                    Right val -> foldr (<#>) Empty val
 
 -- Parsing utilities
 
@@ -157,3 +166,6 @@ lineEnding = (string "\r\n" <|> string "\n" <|> string "\r") >>= return
 
 lineEnding_ :: Parser ()
 lineEnding_ = (lineEnding >> return ()) <|> eof
+
+linkChar :: Parser Char
+linkChar = (string "\\]" >> return ']') <|> noneOf "]"

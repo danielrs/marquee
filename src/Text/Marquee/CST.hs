@@ -25,6 +25,10 @@ data Doc =  Empty
             | Cons Doc Doc
             deriving (Show)
 
+infixr 5 <#>
+(<#>) :: Doc -> Doc -> Doc
+(<#>) = cons
+
 cons :: Doc -> Doc -> Doc
 cons a Empty = a
 cons Empty b = b

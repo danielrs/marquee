@@ -11,7 +11,7 @@ testMarkdown =  unlines [
                 , "[   zero]:"
                 , " zero.com"
                 , " as"
-                , "**Carefulness** is required, folow the _guidelines_:"
+                , "\\**Carefulness** is required, follow the _guidelines_:"
                 , "```javascript"
                 , "let i = 0;"
                 , "++i;"
