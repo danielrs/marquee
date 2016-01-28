@@ -1,7 +1,6 @@
 module Text.ParserCombinators.Parsec.Marquee where
 
 import Control.Monad (liftM2)
-import Data.Char (isSpace, isPunctuation)
 import Text.ParserCombinators.Parsec
 
 none :: Parser ()
@@ -27,14 +26,3 @@ atMostN1 :: Int -> Parser a -> Parser [a]
 atMostN1 n p
   | n <= 1 = count 1 p
   | otherwise = try (count n p) <|> atMostN1 (n - 1) p
-
--- Char
-
-printable :: Parser Char
-printable = satisfy (not . isSpace)
-
-punctuation :: Parser Char
-punctuation = satisfy isPunctuation
-
-whitespace :: Parser Char
-whitespace = satisfy (\c -> isSpace c && c /= '\n')
