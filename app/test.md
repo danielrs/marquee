@@ -1,60 +1,118 @@
-    // some code first
-    void test(const int i);
-    void main() {
-      test(10);
-      return 0;
-    }
-
-# Coding guidelines
-
-[ zero]:
- zero.com
- Cero
-
-\**Carefulness* is required, follow the _guidelines_:
-More than this is beautiful
-
-```javascript
-let i = 0;
-++i;
-console.log(i);
-```
-
-    Forgot this one
-    And this one
-    Or this
-
-    This is another indented block
-    Lo besto
+# Thematic breaks
 
 ---
+===
+_  __ _ _ _
+** ** **
 
-## Todo
+Headers
+====
 
-* This
-* And this
-* # Hahaha
+# One
+## Two
+### Three
+#### Four
+##### Five
+###### Six
 
-1. This
-2. That
-3) Other
+One
+====
+Two
+----
 
-> Blockquotes working!
-> Here's another one
->Withoutspace
+# Indented code blocks
 
-> Here's another example
-with following blockquotes arrows omitted!
-Super awesome huh?
+    // Block 1
+    var i = 0;
+    console.log(i);
 
-> And here's another with
-only one arrow ommited
+    // Block 2
+    var i = 0;
+      console.log(i);
+
+      // Block 3
+      var i = 0; console.log(i);
+
+# Fenced code blocks
+
+```javascript
+var i = 0;
+console.log(i);
+console.log(++i);
+```
+
+   ```haskell
+   factorial :: Int -> Int
+   factorial 0 = 1
+   factorial n = n * factorial (n - 1)
+   ```
+
+# Link reference
+The following blocks are removed from the AST; so they are not shown.
+
+[link1](www.google.com)
+[link2](www.google.com 'Google')
+
+Follow the next [link](#next-section)
+
+The following link contains [some **awesome** *styles* __like _woaw___](www.stylish.com "Stylish")
+
+# Emphasis tests
+
+**bold**
+
+*italic*
+
+**bold *italic***
+
+*italic **bold***
+
+**bold after **bold**
+
+*italic after *italic*
+
+***italic* bold**
+
+***bold** italic*
+
+*foo **bar *baz* bim** bop*
+and another paragraph line here
+Just because **why not**? this looks awesome
+
+# Blockquotes
+
 > Wow!
+Awesome
+Just another
+Blockquote stuff
 
-[secret]: secret.com jijiji
+# Lists
 
-[one]: one.com Uno
+* One
+* Two
+* Three
+* Four
 
->>> foo
-> bar
->> baz
+
+* Uno
+
+* Dos
+
+* Tres
+
+* Cuatro
+
+
+1. One
+2. Two
+3. Three
+4. Four
+
+
+1) Uno
+
+2) Dos
+
+3) Tres
+
+4) Cuatro
