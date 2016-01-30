@@ -20,15 +20,41 @@ import qualified Text.Marquee.AST as A
 
 -- API
 
-parseDoc :: Parser C.Doc
-parseDoc = sepEndBy block lineEnding
-
 renderCST :: String -> C.Doc
 renderCST input = case parse parseDoc "Markdown" input of
                     Left err -> error $ show err
                     Right val -> C.clean $ val
 
+renderAST :: String -> A.Markdown
+renderAST input =
+  case parse parseDoc "CST-parse" input of
+    Left err -> error . show $ err
+    Right cst ->
+      let (linkMap, cst') = A.stripLinkReferences . C.clean $ cst
+      in map (fromDocElement linkMap) cst'
+
+
 -- PARSING CST
+
+parseDoc :: Parser C.Doc
+parseDoc = sepEndBy block lineEnding
+
+block :: Parser C.DocElement
+block = choice [
+  try blankLine
+  , try headingUnderline
+  , try thematicBreak
+  , try heading
+  , try indented
+  , try fenced
+  , try linkReference
+  -- Container
+  , try blockquote
+  , try unorderedList
+  , try orderedList
+  -- Any other is a paragraph
+  , paragraph
+  ]
 
 blankLine :: Parser C.DocElement
 blankLine = do
@@ -126,23 +152,6 @@ orderedList = do
   content <- block
   return $ C.orderedList num content
 
-block :: Parser C.DocElement
-block = choice [
-  try blankLine
-  , try headingUnderline
-  , try thematicBreak
-  , try heading
-  , try indented
-  , try fenced
-  , try linkReference
-  -- Container
-  , try blockquote
-  , try unorderedList
-  , try orderedList
-  -- Any other is a paragraph
-  , paragraph
-  ]
-
 rawInline :: Parser String
 rawInline = manyTill anyChar (lookAhead lineEnding_)
 
@@ -159,9 +168,28 @@ infixl 7 >>+
 (>>+) Nothing rule      = Just rule
 (>>+) (Just rules) rule = Just $ rules >> rule
 
-
-type Inline = ReaderT A.LinkMap
 type InlineParser = Parsec String A.LinkMap
+
+parseInlines :: A.LinkMap -> [String] -> A.MarkdownInline
+parseInlines linkMap xs =
+  case sequence $ map (parse (inline Nothing) "markdown-inline") xs of
+    Left err -> error . show $ err
+    Right val -> foldr (A.</>) A.noInline val
+  where parse p = runParser p linkMap
+
+inline :: ParsingRules -> InlineParser A.MarkdownInline
+inline rules =
+  (eof >> return A.noInline)
+  <|>
+  (do
+    xs <- many1 $ choice  [try codespan
+                          , try $ bold rules
+                          , try $ italic rules
+                          , try $ link rules
+                          -- , try $ matchingInline
+                          , inlineText rules]
+    return $ foldr (A.<#>) A.noInline xs
+  )
 
 codespan :: InlineParser A.MarkdownInline
 codespan = do
@@ -170,14 +198,6 @@ codespan = do
   count (length open) (char $ head open)
   return $ A.codespan content
   where codespanChar = (string "\\`" >> return '`') <|> noneOf "`"
-
-flanked :: String -> String -> ParsingRules -> InlineParser A.MarkdownInline
-flanked open close rules = do
-  string open
-  notFollowedBy whitespace
-  content <- inline $ rules >>+ notFollowedBy (string close)
-  string close
-  return $ content
 
 bold :: ParsingRules -> InlineParser A.MarkdownInline
 bold rules = do
@@ -190,6 +210,14 @@ italic rules = do
   xs <- try (flanked "*" "*" rules)
         <|> flanked "_" "_" rules
   return $ A.italic xs
+
+flanked :: String -> String -> ParsingRules -> InlineParser A.MarkdownInline
+flanked open close rules = do
+  string open
+  notFollowedBy whitespace
+  content <- inline $ rules >>+ notFollowedBy (string close)
+  string close
+  return $ content
 
 link :: ParsingRules -> InlineParser A.MarkdownInline
 link rules = do
@@ -241,11 +269,6 @@ image = undefined
 --         matching' open = (char (closing open) >>= return . (:[]))
 --                     <|> (anyChar >>= \c -> matching' open >>= \cs -> return (c:cs))
 
-escapedChar :: InlineParser Char
-escapedChar =  ((notFollowedBy lineEnding >> escaped) <|> anyChar) >>= return
-  where escaped :: InlineParser Char
-        escaped = char '\\' >> satisfy isPunctuation
-
 inlineText :: ParsingRules -> InlineParser A.MarkdownInline
 inlineText rules =
   manyTill1
@@ -253,26 +276,10 @@ inlineText rules =
   (lineEnding_ <|> (void $ lookAhead $ oneOf "*_[]"))
   >>= return . A.text
 
-inline :: ParsingRules -> InlineParser A.MarkdownInline
-inline rules =
-  (eof >> return A.noInline)
-  <|>
-  (do
-    xs <- many1 $ choice  [try codespan
-                          , try $ bold rules
-                          , try $ italic rules
-                          , try $ link rules
-                          -- , try $ matchingInline
-                          , inlineText rules]
-    return $ foldr (A.<#>) A.noInline xs
-  )
-
-parseInlines :: A.LinkMap -> [String] -> A.MarkdownInline
-parseInlines linkMap xs =
-  case sequence $ map (parse (inline Nothing) "markdown-inline") xs of
-    Left err -> error . show $ err
-    Right val -> foldr (A.</>) A.noInline val
-  where parse p = runParser p linkMap
+escapedChar :: InlineParser Char
+escapedChar =  ((notFollowedBy lineEnding >> escaped) <|> anyChar) >>= return
+  where escaped :: InlineParser Char
+        escaped = char '\\' >> satisfy isPunctuation
 
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement
 fromDocElement linkMap C.BlankLine             = A.BlankLine
@@ -286,19 +293,6 @@ fromDocElement linkMap (C.LinkReference _ _ _) = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)  = A.Blockquote $ map (fromDocElement linkMap) xs
 fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDocElement linkMap) xs
 fromDocElement linkMap (C.OListBlock xs)       = A.OrderedList $ map (second $ fromDocElement linkMap) xs
-
-renderAST :: String -> A.Markdown
-renderAST input =
-  case parse parseDoc "CST-parse" input of
-    Left err -> error . show $ err
-    Right cst ->
-      let (linkMap, cst') = A.stripLinkReferences . C.clean $ cst
-      in map (fromDocElement linkMap) cst'
-
--- USEFUL PARSING
-
--- nextWord :: Parsec String u Char -> Parsec String u String
--- nextWord endP = skipMany whitespace >> manyTill1 anyChar (lookAhead $ endP <|> whitespace)
 
 -- USEFUL DEFINITIONS
 
