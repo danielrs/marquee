@@ -9,7 +9,7 @@ import Data.Either (rights)
 import Data.List (intercalate)
 import qualified Data.Map as M (lookup)
 
-import Text.Parsec (Parsec(..))
+import Text.Parsec (Parsec(..), modifyState)
 import Text.ParserCombinators.Parsec hiding (spaces, space)
 import Text.ParserCombinators.Parsec.Char (oneOf, noneOf)
 
@@ -25,22 +25,37 @@ renderCST :: String -> C.Doc
 renderCST input = case parse parseDoc "Markdown" input of
                     Left err -> error $ show err
                     Right val -> C.clean $ val
+  where parse p = runParser p []
 
 renderAST :: String -> A.Markdown
 renderAST input =
   case parse parseDoc "CST-parse" input of
     Left err -> error . show $ err
     Right cst ->
-      let (linkMap, cst') = A.stripLinkReferences . C.clean $ cst
+      let (linkMap, cst') = second C.clean . A.stripLinkReferences $ cst
       in map (fromDocElement linkMap) cst'
+  where parse p = runParser p []
 
 
 -- PARSING CST
 
-parseDoc :: Parser C.Doc
+type BlockParser = Parsec String [Int]
+
+indentBlock :: Int -> BlockParser ()
+indentBlock n = modifyState ((:) n)
+
+unindentBlock :: BlockParser ()
+unindentBlock = modifyState f
+  where f []     = []
+        f (_:xs) = xs
+
+indentLevel :: BlockParser Int
+indentLevel = liftM sum getState
+
+parseDoc :: BlockParser C.Doc
 parseDoc = sepEndBy block lineEnding
 
-block :: Parser C.DocElement
+block :: BlockParser C.DocElement
 block = choice [
   try blankLine
   , try headingUnderline
@@ -57,26 +72,24 @@ block = choice [
   , paragraph
   ]
 
-blankLine :: Parser C.DocElement
-blankLine = do
-  manyTill whitespace (lookAhead lineEnding_)
-  return C.blankLine
+blankLine :: BlockParser C.DocElement
+blankLine = skipMany whitespace >> lookAhead lineEnding_ >> return C.blankLine
 
-headingUnderline :: Parser C.DocElement
+headingUnderline :: BlockParser C.DocElement
 headingUnderline = do
   indent
   c <- try (setextOf '=') <|> setextOf '-'
   return $ C.headingUnderline (if c == '=' then 1 else 2)
   where setextOf c = manyN 3 (char c) >>= \(c:_) -> skipMany whitespace >> lookAhead lineEnding_ >> return c
 
-thematicBreak :: Parser C.DocElement
+thematicBreak :: BlockParser C.DocElement
 thematicBreak = do
   indent
   try (thematicBreakOf '*') <|> try (thematicBreakOf '-') <|> thematicBreakOf '_'
   return C.thematicBreak
   where thematicBreakOf c = manyN 3 (char c >> skipMany whitespace) >> lookAhead lineEnding_
 
-heading :: Parser C.DocElement
+heading :: BlockParser C.DocElement
 heading = do
   indent
   pounds <- atMostN1 6 (char '#')
@@ -84,13 +97,13 @@ heading = do
   content <- rawInline
   return $ C.heading (length pounds) content
 
-indented :: Parser C.DocElement
+indented :: BlockParser C.DocElement
 indented = do
   count 4 (char ' ')
   content <- rawInline
   return $ C.indentedBlock content
 
-fenced :: Parser C.DocElement
+fenced :: BlockParser C.DocElement
 fenced = do
   indentLen <- indent >>= return . length
 
@@ -108,7 +121,7 @@ fenced = do
   where fenceOf c    = manyN 3 (char c)
         infoChar     = notFollowedBy (char '`') >> anyChar
 
-linkRef :: Parser C.DocElement
+linkRef :: BlockParser C.DocElement
 linkRef = do
   indent
   reference <- between (char '[') (char ']') (skipMany whitespace >> linkReference)
@@ -125,12 +138,12 @@ linkRef = do
             (if length title > 0 then Just title else Nothing)
   where parseTitle = printable >>= \t -> manyTill anyChar (lookAhead lineEnding_) >>= return . (:) t
 
-paragraph :: Parser C.DocElement
+paragraph :: BlockParser C.DocElement
 paragraph = do
   content <- rawInline
   return $ C.paragraphBlock content
 
-blockquote :: Parser C.DocElement
+blockquote :: BlockParser C.DocElement
 blockquote = do
   indent
   char '>' >> optional whitespace
@@ -138,21 +151,34 @@ blockquote = do
   content <- block
   return $ C.blockquoteBlock content
 
-unorderedList :: Parser C.DocElement
+unorderedList :: BlockParser C.DocElement
 unorderedList = do
   indent
-  bulletMarker >> whitespace
-  content <- block
-  return $ C.unorderedList content
 
-orderedList :: Parser C.DocElement
+  bulletMarker
+  spaces <- many1 whitespace
+  let nestedBlock  = count (1 + length spaces) whitespace >> block
+
+  x <- block
+
+  -- indent (1 + length spaces)
+  xs <- many $ try $ lineEnding >> (try nestedBlock <|> (blankLine >> lineEnding >> nestedBlock))
+  -- unindent
+
+  return $ C.unorderedList (x:xs)
+
+orderedList :: BlockParser C.DocElement
 orderedList = do
   indent
-  num <- orderedMarker >>= \x -> whitespace >> return x
-  content <- block
-  return $ C.orderedList num content
 
-rawInline :: Parser String
+  num <- orderedMarker
+  spaces <- many1 whitespace
+  let indent = length num + length spaces + 1
+
+  content <- block
+  return $ C.orderedList (read num) content
+
+rawInline :: BlockParser String
 rawInline = manyTill anyChar (lookAhead lineEnding_)
 
 -- CST to AST and parsing inlines
@@ -296,6 +322,9 @@ inlineText rules =
   (lineEnding_ <|> (void $ lookAhead $ oneOf "`*_[]\\"))
   >>= return . A.text
 
+fromDoc :: A.LinkMap -> C.Doc -> A.Markdown
+fromDoc linkMap = map (fromDocElement linkMap)
+
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement
 fromDocElement linkMap C.BlankLine             = A.BlankLine
 fromDocElement linkMap C.ThematicBreak         = A.ThematicBreak
@@ -306,7 +335,7 @@ fromDocElement linkMap (C.Fenced info xs)      = A.Fenced info xs
 fromDocElement linkMap (C.ParagraphBlock xs)   = A.Paragraph (parseInlines linkMap xs)
 fromDocElement linkMap (C.LinkReference _ _ _) = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)  = A.Blockquote $ map (fromDocElement linkMap) xs
-fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDocElement linkMap) xs
+fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDoc linkMap) xs
 fromDocElement linkMap (C.OListBlock xs)       = A.OrderedList $ map (second $ fromDocElement linkMap) xs
 
 -- USEFUL DEFINITIONS
@@ -343,8 +372,8 @@ linkTitle = try (titleOf '"') <|> titleOf '\''
   where titleOf :: Char -> Parsec String u String
         titleOf c = char c >> manyTill anyChar (char c)
 
-bulletMarker :: Parser Char
+bulletMarker :: Parsec String u Char
 bulletMarker = oneOf "-+*"
 
-orderedMarker :: Parser Int
-orderedMarker = atMostN1 10 digit >>= return . read >>= \x -> oneOf ".)" >> return x
+orderedMarker :: Parsec String u String
+orderedMarker = atMostN1 10 digit <* oneOf ".)"

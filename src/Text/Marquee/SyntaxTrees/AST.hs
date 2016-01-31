@@ -14,7 +14,7 @@ data MarkdownElement  = BlankLine
                         | Fenced String [String]
                         | Paragraph MarkdownInline
                         | Blockquote [MarkdownElement]
-                        | UnorderedList [MarkdownElement]
+                        | UnorderedList [Markdown]
                         | OrderedList [(Int, MarkdownElement)]
                         deriving (Eq, Show)
 

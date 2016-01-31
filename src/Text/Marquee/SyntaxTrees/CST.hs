@@ -18,7 +18,7 @@ data DocElement = BlankLine
                   | LinkReference String String (Maybe String)
                   -- Container blocks
                   | BlockquoteBlock [DocElement]
-                  | UListBlock [DocElement]
+                  | UListBlock [Doc]
                   | OListBlock [(Int, DocElement)]
                   deriving (Eq, Show)
 
@@ -51,7 +51,7 @@ linkReference ref url title = LinkReference (map toLower . trim $ ref) (trim url
 blockquoteBlock :: DocElement -> DocElement
 blockquoteBlock = BlockquoteBlock . (:[])
 
-unorderedList :: DocElement -> DocElement
+unorderedList :: Doc -> DocElement
 unorderedList = UListBlock . (:[])
 
 orderedList :: Int -> DocElement -> DocElement
@@ -73,10 +73,11 @@ group (ParagraphBlock x : HeadingUnderline 2 : xs)    = Heading 2 (lines . trim 
 
 group (BlockquoteBlock x : BlockquoteBlock y : xs)    = group $ BlockquoteBlock (x ++ y) : xs
 group (BlockquoteBlock x : y@(ParagraphBlock _) : xs) = group $ BlockquoteBlock (x ++ [y]) : xs
-group (BlockquoteBlock x : xs)                        = BlockquoteBlock (group x) : group xs
+group (BlockquoteBlock x : xs)                        = BlockquoteBlock (clean x) : group xs
 
 group (UListBlock x : UListBlock y : xs)             = group $ UListBlock (x ++ y) : xs
 group (UListBlock x : BlankLine : UListBlock y : xs) = group $ UListBlock (x ++ y) : xs
+group (UListBlock x : xs)                            = UListBlock (map clean x) : group xs
 group (OListBlock x : OListBlock y : xs)             = group $ OListBlock (x ++ y) : xs
 group (OListBlock x : BlankLine : OListBlock y : xs) = group $ OListBlock (x ++ y) : xs
 

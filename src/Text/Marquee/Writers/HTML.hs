@@ -28,7 +28,7 @@ writeElement (Indented str)    = codeblock "" str
 writeElement (Fenced info str) = codeblock info str
 writeElement (Paragraph x)     = p $ writeInline x
 writeElement (Blockquote x)    = H.blockquote $ writeHtml' x
-writeElement (UnorderedList x) = ul $ forM_ x (li . writeElement)
+writeElement (UnorderedList x) = ul $ forM_ x (li . writeHtml')
 writeElement (OrderedList x)   = ol $ forM_ x (\(n, x) -> li (writeElement x) ! (value $ toValue n))
 writeElement _                 = return ()
 
