@@ -22,29 +22,29 @@ writeHtml' []     = return ()
 writeHtml' (x:xs) = writeElement x >> writeHtml' xs
 
 writeElement :: MarkdownElement -> Html
-writeElement (ThematicBreak)         = hr
-writeElement (Heading n content)     = (lookupOr h4 n headings) $ writeInline content
-writeElement (Indented str)          = codeblock "" str
-writeElement (Fenced info str)       = codeblock info str
-writeElement (Paragraph content)     = p $ writeInline content
-writeElement (Blockquote content)    = H.blockquote $ writeHtml' content
-writeElement (UnorderedList content) = ul $ forM_ content (li . writeElement)
-writeElement (OrderedList content)   = ol $ forM_ content (li . writeElement . snd)
-writeElement _                       = return ()
+writeElement (ThematicBreak)   = hr
+writeElement (Heading n x)     = (lookupOr h4 n headings) $ writeInline x
+writeElement (Indented str)    = codeblock "" str
+writeElement (Fenced info str) = codeblock info str
+writeElement (Paragraph x)     = p $ writeInline x
+writeElement (Blockquote x)    = H.blockquote $ writeHtml' x
+writeElement (UnorderedList x) = ul $ forM_ x (li . writeElement)
+writeElement (OrderedList x)   = ol $ forM_ x (\(n, x) -> li (writeElement x) ! (value $ toValue n))
+writeElement _                 = return ()
 
 writeInline :: MarkdownInline -> Html
-writeInline (HardLineBreak)            = br
-writeInline (LineBreak)                = toHtml (" " :: String)
-writeInline (Text str)                 = toHtml $ str
-writeInline (Codespan str)             = codespan str
-writeInline (Bold content)             = strong $ writeInline content
-writeInline (Italic content)           = em $ writeInline content
-writeInline (Link content dest mtitle) =
+writeInline (HardLineBreak)      = br
+writeInline (LineBreak)          = toHtml (" " :: String)
+writeInline (Text str)           = toHtml $ str
+writeInline (Codespan str)       = codespan str
+writeInline (Bold x)             = strong $ writeInline x
+writeInline (Italic x)           = em $ writeInline x
+writeInline (Link x dest mtitle) =
   let url   = toValue dest
       title = toValue $ maybe dest id mtitle
-  in  (a $ writeInline content) ! href url ! alt title
-writeInline (Cons x y)                 = writeInline x >> writeInline y
-writeInline _                          = return ()
+  in  (a $ writeInline x) ! href url ! alt title
+writeInline (Cons x y)           = writeInline x >> writeInline y
+writeInline _                    = return ()
 
 codespan :: String -> Html
 codespan = code . toHtml
