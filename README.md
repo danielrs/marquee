@@ -8,7 +8,7 @@ I wrote this library for personal usage along with [Yesod][yesod]; however, it c
 
 ### What needs to be done?
 
-The lexer and parser follow most of the rules outlines at *CommonMark*, however, some parsing stills needs polishing:
+The lexer and parser follow most of the rules outlined at *CommonMark*, however, some parsing stills needs polishing:
 
 1. Lists items and Blockquotes don't include *blocks* one *blank line* away. They just are parsed as new blocks at the root level.
 
