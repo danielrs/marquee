@@ -26,5 +26,5 @@ All of the important code lies inside the `Text.Marquee` namespace.
 
 `Text.Marquee.Parser` module is the lexer and parser of Markdown; it returns a CST or AST (one usually wants the AST)
 
-[commonmark]: http://commonmark.org/ CommonMark
-[yesod]: http://www.yesodweb.com/ Yesod
+[commonmark]: http://commonmark.org/
+[yesod]: http://www.yesodweb.com/
