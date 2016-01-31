@@ -33,18 +33,19 @@ writeElement (OrderedList x)   = ol $ forM_ x (\(n, x) -> li (writeElement x) ! 
 writeElement _                 = return ()
 
 writeInline :: MarkdownInline -> Html
-writeInline (HardLineBreak)      = br
-writeInline (LineBreak)          = toHtml (" " :: String)
-writeInline (Text str)           = toHtml $ str
-writeInline (Codespan str)       = codespan str
-writeInline (Bold x)             = strong $ writeInline x
-writeInline (Italic x)           = em $ writeInline x
-writeInline (Link x dest mtitle) =
+writeInline (HardLineBreak)       = br
+writeInline (LineBreak)           = toHtml (" " :: String)
+writeInline (Text str)            = toHtml $ str
+writeInline (Codespan str)        = codespan str
+writeInline (Bold x)              = strong $ writeInline x
+writeInline (Italic x)            = em $ writeInline x
+writeInline (Link x dest mtitle)  =
   let url   = toValue dest
       title = toValue $ maybe dest id mtitle
   in  (a $ writeInline x) ! href url ! alt title
-writeInline (Cons x y)           = writeInline x >> writeInline y
-writeInline _                    = return ()
+writeInline (Image x dest mtitle) = img ! alt (toValue . plain $ x) ! src (toValue dest)
+writeInline (Cons x y)            = writeInline x >> writeInline y
+writeInline _                     = return ()
 
 codespan :: String -> Html
 codespan = code . toHtml

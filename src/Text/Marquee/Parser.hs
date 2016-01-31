@@ -4,7 +4,7 @@ import Control.Arrow (second)
 import Control.Monad
 import Control.Monad.Reader
 
-import Data.Char (isControl, isPunctuation, isSpace)
+import Data.Char (isControl, isPunctuation, isSpace, toLower)
 import Data.Either (rights)
 import Data.List (intercalate)
 import qualified Data.Map as M (lookup)
@@ -189,19 +189,17 @@ inline rules =
                           , try $ bold rules
                           , try $ italic rules
                           , try $ link rules
-                          -- , try $ matchingInline
+                          , try $ image rules
                           , try hardLineBreak
                           , try escapedChar
-                          , inlineText rules]
+                          , try $ inlineText rules]
     return $ foldr (A.<#>) A.noInline xs
   )
 
 codespan :: InlineParser A.MarkdownInline
 codespan = do
   open <- many1 (char '`')
-  content <- many codespanChar
-  count (length open) (char $ head open)
-  return $ A.codespan content
+  try (A.codespan <$> many codespanChar <* count (length open) (char $ head open)) <|> (return $ A.text open)
   where codespanChar = (string "\\`" >> return '`') <|> noneOf "`"
 
 bold :: ParsingRules -> InlineParser A.MarkdownInline
@@ -252,13 +250,17 @@ linkInfo = inlineLink <|> referenceLink
           char '['
           linkRef <- liftM trim $ skipMany whitespace >> linkReference
           char ']'
-          mlink <- lookupLink linkRef
+          mlink <- lookupLink (map toLower . trim $ linkRef)
           case mlink of
             Nothing -> fail $ "Link reference: " ++ linkRef ++ ", not found"
             Just (linkUrl, linkTitle) -> return (linkUrl, linkTitle)
 
-image :: InlineParser A.MarkdownInline
-image = undefined
+image :: ParsingRules-> InlineParser A.MarkdownInline
+image rules = do
+  char '!'
+  linkText <- linkContent rules
+  (linkUrl, linkTitle) <- linkInfo
+  return $ A.image linkText linkUrl linkTitle
 
 hardLineBreak :: InlineParser A.MarkdownInline
 hardLineBreak = do
@@ -291,7 +293,7 @@ inlineText :: ParsingRules -> InlineParser A.MarkdownInline
 inlineText rules =
   manyTill1
   (runRules rules >> anyChar)
-  (lineEnding_ <|> (void $ lookAhead $ oneOf "*_[]\\"))
+  (lineEnding_ <|> (void $ lookAhead $ oneOf "`*_[]\\"))
   >>= return . A.text
 
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement

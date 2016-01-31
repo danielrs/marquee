@@ -27,6 +27,7 @@ data MarkdownInline = NoInline
                       | Bold MarkdownInline
                       | Italic MarkdownInline
                       | Link MarkdownInline String (Maybe String)
+                      | Image MarkdownInline String (Maybe String)
                       -- Cons
                       | Cons MarkdownInline MarkdownInline
                       deriving (Eq, Show)
@@ -79,10 +80,22 @@ italic = Italic
 link :: MarkdownInline -> String -> Maybe String -> MarkdownInline
 link = Link
 
+image :: MarkdownInline -> String -> Maybe String -> MarkdownInline
+image = Image
+
 containsLink :: MarkdownInline -> Bool
 containsLink (Link _ _ _) = True
 containsLink (Cons x y) = containsLink x || containsLink y
 containsLink _ = False
+
+plain :: MarkdownInline -> String
+plain (Text x)     = x
+plain (Codespan x) = x
+plain (Bold x)     = plain x
+plain (Italic x)   = plain x
+plain (Link x _ _) = plain x
+plain (Cons x y)   = plain x ++ plain y
+plain _            = []
 
 -- CST to AST
 

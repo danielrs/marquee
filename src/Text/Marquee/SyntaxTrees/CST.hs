@@ -1,8 +1,8 @@
 module Text.Marquee.SyntaxTrees.CST where
 
-import Data.Foldable
-import Data.String.Marquee
+import Data.Char (toLower)
 
+import Data.String.Marquee
 import Data.List.Marquee
 
 type Doc = [DocElement]
@@ -46,7 +46,7 @@ paragraphBlock :: String -> DocElement
 paragraphBlock = ParagraphBlock . (:[])
 
 linkReference :: String -> String -> Maybe String -> DocElement
-linkReference ref url title = LinkReference (trim ref) (trim url) (trim <$> title)
+linkReference ref url title = LinkReference (map toLower . trim $ ref) (trim url) (trim <$> title)
 
 blockquoteBlock :: DocElement -> DocElement
 blockquoteBlock = BlockquoteBlock . (:[])
