@@ -7,6 +7,7 @@ import Control.Monad.Reader
 import Data.Char (isControl, isPunctuation, isSpace)
 import Data.Either (rights)
 import Data.List (intercalate)
+import qualified Data.Map as M (lookup)
 
 import Text.Parsec (Parsec(..))
 import Text.ParserCombinators.Parsec hiding (spaces, space)
@@ -15,8 +16,8 @@ import Text.ParserCombinators.Parsec.Char (oneOf, noneOf)
 import Data.String.Marquee
 import Text.ParserCombinators.Parsec.Marquee
 
-import qualified Text.Marquee.CST as C
-import qualified Text.Marquee.AST as A
+import qualified Text.Marquee.SyntaxTrees.CST as C
+import qualified Text.Marquee.SyntaxTrees.AST as A
 
 -- API
 
@@ -47,7 +48,7 @@ block = choice [
   , try heading
   , try indented
   , try fenced
-  , try linkReference
+  , try linkRef
   -- Container
   , try blockquote
   , try unorderedList
@@ -107,17 +108,16 @@ fenced = do
   where fenceOf c    = manyN 3 (char c)
         infoChar     = notFollowedBy (char '`') >> anyChar
 
-linkReference :: Parser C.DocElement
-linkReference = do
+linkRef :: Parser C.DocElement
+linkRef = do
   indent
-  reference <- between (char '[') (char ']') (skipMany whitespace >> many1 linkTextChar)
+  reference <- between (char '[') (char ']') (skipMany whitespace >> linkReference)
   char ':'
 
   skipMany whitespace >> (optional $ lineEnding >> skipMany1 whitespace)
   destination <- many1 printable
-
   skipMany whitespace
-  title <- option "" $ parseTitle <|> (lineEnding_ >> skipMany1 whitespace >> parseTitle)
+  title <- option "" $ parseTitle <|> try (lineEnding_ >> skipMany1 whitespace >> parseTitle)
 
   return $ C.linkReference
             reference
@@ -170,6 +170,9 @@ infixl 7 >>+
 
 type InlineParser = Parsec String A.LinkMap
 
+lookupLink :: String -> InlineParser (Maybe A.Link)
+lookupLink ref = getState >>= return . M.lookup ref
+
 parseInlines :: A.LinkMap -> [String] -> A.MarkdownInline
 parseInlines linkMap xs =
   case sequence $ map (parse (inline Nothing) "markdown-inline") xs of
@@ -187,6 +190,8 @@ inline rules =
                           , try $ italic rules
                           , try $ link rules
                           -- , try $ matchingInline
+                          , try hardLineBreak
+                          , try escapedChar
                           , inlineText rules]
     return $ foldr (A.<#>) A.noInline xs
   )
@@ -245,12 +250,20 @@ linkInfo = inlineLink <|> referenceLink
           return (linkUrl, linkTitle)
         referenceLink = do
           char '['
+          linkRef <- liftM trim $ skipMany whitespace >> linkReference
           char ']'
-          return ("ref.com", Nothing)
-
+          mlink <- lookupLink linkRef
+          case mlink of
+            Nothing -> fail $ "Link reference: " ++ linkRef ++ ", not found"
+            Just (linkUrl, linkTitle) -> return (linkUrl, linkTitle)
 
 image :: InlineParser A.MarkdownInline
 image = undefined
+
+hardLineBreak :: InlineParser A.MarkdownInline
+hardLineBreak = do
+  try (manyN 2 whitespace >> lookAhead lineEnding_) <|> (char '\\' >> lookAhead lineEnding_)
+  return A.HardLineBreak
 
 -- matchingInline :: InlineParser A.MarkdownInline
 -- matchingInline = do
@@ -269,17 +282,17 @@ image = undefined
 --         matching' open = (char (closing open) >>= return . (:[]))
 --                     <|> (anyChar >>= \c -> matching' open >>= \cs -> return (c:cs))
 
+escapedChar :: InlineParser A.MarkdownInline
+escapedChar =  (notFollowedBy lineEnding >> escaped) >>= return . A.text . (:[])
+  where escaped :: InlineParser Char
+        escaped = char '\\' >> satisfy isPunctuation
+
 inlineText :: ParsingRules -> InlineParser A.MarkdownInline
 inlineText rules =
   manyTill1
-  (runRules rules >> (escapedChar <|> anyChar))
-  (lineEnding_ <|> (void $ lookAhead $ oneOf "*_[]"))
+  (runRules rules >> anyChar)
+  (lineEnding_ <|> (void $ lookAhead $ oneOf "*_[]\\"))
   >>= return . A.text
-
-escapedChar :: InlineParser Char
-escapedChar =  ((notFollowedBy lineEnding >> escaped) <|> anyChar) >>= return
-  where escaped :: InlineParser Char
-        escaped = char '\\' >> satisfy isPunctuation
 
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement
 fromDocElement linkMap C.BlankLine             = A.BlankLine
@@ -317,8 +330,8 @@ punctuation = satisfy isPunctuation
 control :: Parsec String u Char
 control = satisfy isControl
 
-linkTextChar :: Parsec String u Char
-linkTextChar = (string "\\]" >> return ']') <|> noneOf "]"
+linkReference :: Parsec String u String
+linkReference = many1 $ (string "\\]" >> return ']') <|> noneOf "]"
 
 linkDestination :: Parsec String u String
 linkDestination = manyTill anyChar (lookAhead $ choice [whitespace, control, char '(', char ')'])

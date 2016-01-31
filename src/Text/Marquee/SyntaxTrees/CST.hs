@@ -1,4 +1,4 @@
-module Text.Marquee.CST where
+module Text.Marquee.SyntaxTrees.CST where
 
 import Data.Foldable
 import Data.String.Marquee

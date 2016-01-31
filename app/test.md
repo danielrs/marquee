@@ -7,6 +7,7 @@ _  __ _ _ _
 
 Headers
 ====
+----
 
 # One
 ## Two
@@ -21,6 +22,7 @@ Two
 ----
 
 # Indented code blocks
+----
 
     // Block 1
     var i = 0;
@@ -34,6 +36,7 @@ Two
       var i = 0; console.log(i);
 
 # Fenced code blocks
+----
 
 ```javascript
 var i = 0;
@@ -48,16 +51,23 @@ console.log(++i);
    ```
 
 # Link reference
-The following blocks are removed from the AST; so they are not shown.
+----
 
-[link1](www.google.com)
-[link2](www.google.com 'Google')
+Link reference blocks are removed from the AST; so they are not shown.
 
-Follow the next [link](#next-section)
+[google]: http://www.google.com Google
+[stacko]: http://www.stackoverflow.com
 
-The following link contains [some **awesome** *styles* __like _woaw___](www.stylish.com "Stylish")
+Follow the next [inline link](#next-section) to a same-page id.
+The following link contains [some **awesome** *styles* __like _woaw___](www.stylish.com "Stylish").
+Link to [google][google] and [stack overflow][stacko] are referenced,
+just like the links to [slack][slack] and [*facebook* the **evil** company][facebook].
+
+[slack]: http://www.slack.com Slack
+[facebook]: http://www.facebook.com
 
 # Emphasis tests
+----
 
 **bold**
 
@@ -80,6 +90,7 @@ and another paragraph line here
 Just because **why not**? this looks awesome
 
 # Blockquotes
+----
 
 > Wow!
 Awesome
@@ -87,6 +98,7 @@ Just another
 Blockquote stuff
 
 # Lists
+----
 
 * One
 * Two
@@ -116,3 +128,16 @@ Blockquote stuff
 3) Tres
 
 4) Cuatro
+
+# Line breaks
+----
+
+This paragraph contains a
+soft break.
+
+This one contains a\
+hard break.
+
+This one contains both
+soft breaks and\
+hard breaks.

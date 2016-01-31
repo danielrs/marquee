@@ -1,6 +1,6 @@
-module Text.Marquee.AST where
+module Text.Marquee.SyntaxTrees.AST where
 
-import Text.Marquee.CST as C
+import Text.Marquee.SyntaxTrees.CST as C
 import qualified Data.Map as M
 
 import Data.String.Marquee
@@ -19,7 +19,8 @@ data MarkdownElement  = BlankLine
                         deriving (Eq, Show)
 
 data MarkdownInline = NoInline
-                      | LineEnding
+                      | LineBreak
+                      | HardLineBreak
                       | Text [Char]
                       -- Special
                       | Codespan String
@@ -29,6 +30,16 @@ data MarkdownInline = NoInline
                       -- Cons
                       | Cons MarkdownInline MarkdownInline
                       deriving (Eq, Show)
+
+-- instance Show MarkdownInline where
+--   show NoInline = ""
+--   show LineEnding = "\n"
+--   show (Text xs) = xs
+--   show (Codespan xs) = "`" ++ xs ++ "`"
+--   show (Bold xs) = "**" ++ show xs ++ "**"
+--   show (Italic xs) = "*" ++ show xs ++ "*"
+--   show (Link xs url mtitle) = "[" ++ show xs ++ "]" ++ "(" ++ url ++ ")"
+--   show (Cons x y) = show x ++ show y
 
 cons :: MarkdownInline -> MarkdownInline -> MarkdownInline
 cons x NoInline                    = x
@@ -44,7 +55,7 @@ infixr 5 <#>
 consLines :: MarkdownInline -> MarkdownInline -> MarkdownInline
 consLines x NoInline = x
 consLines NoInline y = y
-consLines a b        = cons a (cons LineEnding b)
+consLines a b        = cons a (cons LineBreak b)
 
 infixr 5 </>
 (</>) :: MarkdownInline -> MarkdownInline -> MarkdownInline
@@ -75,7 +86,8 @@ containsLink _ = False
 
 -- CST to AST
 
-type LinkMap = M.Map String (String, Maybe String)
+type Link = (String, Maybe String)
+type LinkMap = M.Map String Link
 
 insertLink :: String -> (String, Maybe String) -> LinkMap -> LinkMap
 insertLink = M.insertWith (flip const)
