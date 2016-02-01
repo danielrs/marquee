@@ -39,15 +39,14 @@ renderAST input =
 
 -- PARSING CST
 
+-- Block parser where the state is indent levels in a stack
 type BlockParser = Parsec String [Int]
 
 indent :: Int -> BlockParser Int
 indent n = modifyState ((:) n) >> indentLevel
 
 unindent :: BlockParser ()
-unindent = modifyState f
-  where f []     = []
-        f (_:xs) = xs
+unindent = modifyState (drop 1)
 
 indentLevel :: BlockParser Int
 indentLevel = liftM sum getState
@@ -123,7 +122,7 @@ fenced = do
   infoString <- manyTill infoChar lineEnding_
   content    <- manyTill
                 (fenceIndent >> manyTill anyChar lineEnding_)
-                (try (fenceIndent >> optIndent >> manyN fenceLen fenceChar >> lookAhead lineEnding_) <|> eof)
+                (eof <|> (fenceIndent >> optIndent >> manyN fenceLen fenceChar >> lookAhead lineEnding_))
 
   return $ C.fenced infoString content
   where fenceOf c    = manyN 3 (char c)
