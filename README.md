@@ -1,6 +1,6 @@
 # Marquee
 
-Markdown parser written in Haskell and parsec. It follows (or tries to follow) most of the [CommonMark][commonmark] especification.
+Markdown parser transpiler (source-to-source compiler) written in Haskell and parsec. It follows (or tries to follow) most of the [CommonMark][commonmark] especification.
 
 ### Purpose
 
