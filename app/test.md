@@ -57,12 +57,34 @@ A paragraph inside a blockquote
 ### Unordered
 
 * One
+  * 1
+  * 2
+  * 3
+  * 4
 * Two
+  * Really two?
+    * Yeah
+      * Okay
+    * Come back
+  * On my way
 * Three
+  * Follow the 3s
+    ```
+    3 3 3 3 3 3 3 3
+    Three 3 Three 3
+        Tres
+      Tress
+    3 3 3
+    ```
 * Four
+      FOUR
 
 
 * Uno
+
+  Nested paragraphs are\
+  also allowed. With hard breaks\
+  and everything
 
 * Dos
 
@@ -73,10 +95,19 @@ A paragraph inside a blockquote
 
 ### Ordered
 
-1.   One
-2. Two
-3. Three
-4. Four
+1.   One\
+     More nested. Is not that hard\
+     just follow the alignment of the item:
+     ```
+     1. Name
+        This is nested
+     ```
+2. Two\
+   Nested
+3. Three\
+   **Nested**
+4. Four\
+       Nested
 
 
 1) Uno
@@ -148,30 +179,3 @@ hard breaks.
 
 [haskell logo]: https://www.haskell.org/static/img/logo.png?etag=rJR84DMh Haskell
 [octocat]: https://camo.githubusercontent.com/fb782da4019ab66eeea35cc9b9ce73b2438b1688/687474703a2f2f646f632e72756c746f722e636f6d2f696d616765732f6769746875622d6c6f676f2e706e67
-
-* This is a
-  Nested paragraph
-  inside a list with [links][google]
-
-  # And a heading 1
-
-      Nested code
-
-* Another one
-  *WOW*
-
-* Why not nest multiple lists?\
-  Let's try
-
-  1. One
-  2. Two
-  3. Three
-
-  or
-
-  + One
-  + Two
-  + Three
-
-
-

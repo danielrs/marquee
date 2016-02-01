@@ -41,11 +41,11 @@ renderAST input =
 
 type BlockParser = Parsec String [Int]
 
-indentBlock :: Int -> BlockParser ()
-indentBlock n = modifyState ((:) n)
+indent :: Int -> BlockParser Int
+indent n = modifyState ((:) n) >> indentLevel
 
-unindentBlock :: BlockParser ()
-unindentBlock = modifyState f
+unindent :: BlockParser ()
+unindent = modifyState f
   where f []     = []
         f (_:xs) = xs
 
@@ -61,7 +61,7 @@ block = choice [
   , try headingUnderline
   , try thematicBreak
   , try heading
-  , try indented
+  , try indentedBlock
   , try fenced
   , try linkRef
   -- Container
@@ -72,40 +72,48 @@ block = choice [
   , paragraph
   ]
 
+indented :: BlockParser C.DocElement -> BlockParser C.DocElement
+indented p =
+  indentLevel >>= \level ->
+  try (count level whitespace >> p) <|> (notFollowedBy blankLine2 >> blankLine)
+
 blankLine :: BlockParser C.DocElement
 blankLine = skipMany whitespace >> lookAhead lineEnding_ >> return C.blankLine
 
+blankLine2 :: BlockParser ()
+blankLine2 = blankLine >> lineEnding >> blankLine >> return ()
+
 headingUnderline :: BlockParser C.DocElement
 headingUnderline = do
-  indent
+  optIndent
   c <- try (setextOf '=') <|> setextOf '-'
   return $ C.headingUnderline (if c == '=' then 1 else 2)
   where setextOf c = manyN 3 (char c) >>= \(c:_) -> skipMany whitespace >> lookAhead lineEnding_ >> return c
 
 thematicBreak :: BlockParser C.DocElement
 thematicBreak = do
-  indent
+  optIndent
   try (thematicBreakOf '*') <|> try (thematicBreakOf '-') <|> thematicBreakOf '_'
   return C.thematicBreak
   where thematicBreakOf c = manyN 3 (char c >> skipMany whitespace) >> lookAhead lineEnding_
 
 heading :: BlockParser C.DocElement
 heading = do
-  indent
+  optIndent
   pounds <- atMostN1 6 (char '#')
   (whitespace >> return ()) <|> lookAhead lineEnding_
   content <- rawInline
   return $ C.heading (length pounds) content
 
-indented :: BlockParser C.DocElement
-indented = do
+indentedBlock :: BlockParser C.DocElement
+indentedBlock = do
   count 4 (char ' ')
   content <- rawInline
   return $ C.indentedBlock content
 
 fenced :: BlockParser C.DocElement
 fenced = do
-  indentLen <- indent >>= return . length
+  indentLen <- indentLevel >>= \level -> optIndent >>= \opt -> return (level + length opt)
 
   fence <- try (fenceOf '`') <|> fenceOf '~'
   let fenceLen  = length fence
@@ -115,7 +123,7 @@ fenced = do
   infoString <- manyTill infoChar lineEnding_
   content    <- manyTill
                 (fenceIndent >> manyTill anyChar lineEnding_)
-                (try (fenceIndent >> indent >> manyN fenceLen fenceChar >> lookAhead lineEnding_) <|> eof)
+                (try (fenceIndent >> optIndent >> manyN fenceLen fenceChar >> lookAhead lineEnding_) <|> eof)
 
   return $ C.fenced infoString content
   where fenceOf c    = manyN 3 (char c)
@@ -123,7 +131,7 @@ fenced = do
 
 linkRef :: BlockParser C.DocElement
 linkRef = do
-  indent
+  optIndent
   reference <- between (char '[') (char ']') (skipMany whitespace >> linkReference)
   char ':'
 
@@ -145,7 +153,7 @@ paragraph = do
 
 blockquote :: BlockParser C.DocElement
 blockquote = do
-  indent
+  optIndent
   char '>' >> optional whitespace
   skipMany whitespace
   content <- block
@@ -153,30 +161,31 @@ blockquote = do
 
 unorderedList :: BlockParser C.DocElement
 unorderedList = do
-  indent
+  optIndent
 
   bulletMarker
   spaces <- many1 whitespace
-  let nestedBlock  = count (1 + length spaces) whitespace >> block
 
+  indent (1 + length spaces)
   x <- block
-
-  -- indent (1 + length spaces)
-  xs <- many $ try $ lineEnding >> (try nestedBlock <|> (blankLine >> lineEnding >> nestedBlock))
-  -- unindent
+  xs <- many $ try $ lineEnding >> indented block
+  unindent
 
   return $ C.unorderedList (x:xs)
 
 orderedList :: BlockParser C.DocElement
 orderedList = do
-  indent
+  optIndent
 
   num <- orderedMarker
   spaces <- many1 whitespace
-  let indent = length num + length spaces + 1
 
-  content <- block
-  return $ C.orderedList (read num) content
+  indent (length num + 1 + length spaces)
+  x <- block
+  xs <- many $ try $ lineEnding >> indented block
+  unindent
+
+  return $ C.orderedList (read num) (x:xs)
 
 rawInline :: BlockParser String
 rawInline = manyTill anyChar (lookAhead lineEnding_)
@@ -336,7 +345,7 @@ fromDocElement linkMap (C.ParagraphBlock xs)   = A.Paragraph (parseInlines linkM
 fromDocElement linkMap (C.LinkReference _ _ _) = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)  = A.Blockquote $ map (fromDocElement linkMap) xs
 fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDoc linkMap) xs
-fromDocElement linkMap (C.OListBlock xs)       = A.OrderedList $ map (second $ fromDocElement linkMap) xs
+fromDocElement linkMap (C.OListBlock xs)       = A.OrderedList $ map (second $ fromDoc linkMap) xs
 
 -- USEFUL DEFINITIONS
 
@@ -349,8 +358,8 @@ lineEnding_ = (lineEnding >> return ()) <|> eof
 whitespace :: Parsec String u Char
 whitespace = satisfy (\c -> isSpace c && c /= '\n')
 
-indent :: Parsec String u [Char]
-indent = atMostN 3 (char ' ')
+optIndent :: Parsec String u [Char]
+optIndent = atMostN 3 (char ' ')
 
 printable :: Parsec String u Char
 printable = satisfy (not . isSpace)

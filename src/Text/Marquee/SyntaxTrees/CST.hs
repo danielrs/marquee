@@ -1,5 +1,6 @@
 module Text.Marquee.SyntaxTrees.CST where
 
+import Control.Arrow (second)
 import Data.Char (toLower)
 
 import Data.String.Marquee
@@ -19,7 +20,7 @@ data DocElement = BlankLine
                   -- Container blocks
                   | BlockquoteBlock [DocElement]
                   | UListBlock [Doc]
-                  | OListBlock [(Int, DocElement)]
+                  | OListBlock [(Int, Doc)]
                   deriving (Eq, Show)
 
 -- CONSTRUCTION FUNCTIONS
@@ -54,8 +55,8 @@ blockquoteBlock = BlockquoteBlock . (:[])
 unorderedList :: Doc -> DocElement
 unorderedList = UListBlock . (:[])
 
-orderedList :: Int -> DocElement -> DocElement
-orderedList x = OListBlock . (:[]) . (,) x
+orderedList :: Int -> Doc -> DocElement
+orderedList n = OListBlock . (:[]) . (,) n
 
 -- HELPER FUNCTIONS
 
@@ -80,6 +81,7 @@ group (UListBlock x : BlankLine : UListBlock y : xs) = group $ UListBlock (x ++ 
 group (UListBlock x : xs)                            = UListBlock (map clean x) : group xs
 group (OListBlock x : OListBlock y : xs)             = group $ OListBlock (x ++ y) : xs
 group (OListBlock x : BlankLine : OListBlock y : xs) = group $ OListBlock (x ++ y) : xs
+group (OListBlock x : xs)                            = OListBlock (map (second clean) x) : group xs
 
 group (x:xs)                                          = x : group xs
 

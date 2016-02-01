@@ -10,11 +10,9 @@ I wrote this library for personal usage along with [Yesod][yesod]; however, it c
 
 The lexer and parser follow most of the rules outlined at *CommonMark*, however, some parsing stills needs polishing:
 
-1. Lists items and Blockquotes don't include *blocks* one *blank line* away. They just are parsed as new blocks at the root level.
+1. Raw HTML parsing; nothing implemented until now.
 
-2. Raw HTML parsing; nothing implemented until now.
-
-3. Optimize the parser for less backtracking.
+2. Optimize the parser for less backtracking.
 
 ### Structure of the library
 

@@ -15,7 +15,7 @@ data MarkdownElement  = BlankLine
                         | Paragraph MarkdownInline
                         | Blockquote [MarkdownElement]
                         | UnorderedList [Markdown]
-                        | OrderedList [(Int, MarkdownElement)]
+                        | OrderedList [(Int, Markdown)]
                         deriving (Eq, Show)
 
 data MarkdownInline = NoInline
