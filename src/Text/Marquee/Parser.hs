@@ -60,7 +60,7 @@ block = choice [
   , try headingUnderline
   , try thematicBreak
   , try heading
-  , try indentedBlock
+  , try indentedLine
   , try fenced
   , try linkRef
   -- Container
@@ -77,114 +77,90 @@ indented p =
   try (count level whitespace >> p) <|> (notFollowedBy blankLine2 >> blankLine)
 
 blankLine :: BlockParser C.DocElement
-blankLine = skipMany whitespace >> lookAhead lineEnding_ >> return C.blankLine
+blankLine = skipMany whitespace *> lookAhead lineEnding_ *> return C.blankLine
 
 blankLine2 :: BlockParser ()
-blankLine2 = blankLine >> lineEnding >> blankLine >> return ()
+blankLine2 = blankLine *> lineEnding *> blankLine *> pure ()
 
 headingUnderline :: BlockParser C.DocElement
 headingUnderline = do
   optIndent
-  c <- try (setextOf '=') <|> setextOf '-'
+  (c:_) <- try (setextOf '=') <|> setextOf '-'
   return $ C.headingUnderline (if c == '=' then 1 else 2)
-  where setextOf c = manyN 3 (char c) >>= \(c:_) -> skipMany whitespace >> lookAhead lineEnding_ >> return c
+  where setextOf c = manyN 3 (char c) <* skipMany whitespace <* lookAhead lineEnding_
 
 thematicBreak :: BlockParser C.DocElement
 thematicBreak = do
   optIndent
   try (thematicBreakOf '*') <|> try (thematicBreakOf '-') <|> thematicBreakOf '_'
   return C.thematicBreak
-  where thematicBreakOf c = manyN 3 (char c >> skipMany whitespace) >> lookAhead lineEnding_
+  where thematicBreakOf c = manyN 3 (char c <* skipMany whitespace) <* lookAhead lineEnding_
 
 heading :: BlockParser C.DocElement
 heading = do
   optIndent
   pounds <- atMostN1 6 (char '#')
-  (whitespace >> return ()) <|> lookAhead lineEnding_
+  (whitespace *> pure ()) <|> lookAhead lineEnding_
   content <- rawInline
   return $ C.heading (length pounds) content
 
-indentedBlock :: BlockParser C.DocElement
-indentedBlock = do
-  count 4 (char ' ')
-  content <- rawInline
-  return $ C.indentedBlock content
+indentedLine :: BlockParser C.DocElement
+indentedLine = C.indentedBlock <$> (count 4 (char ' ') *> rawInline)
 
 fenced :: BlockParser C.DocElement
 fenced = do
-  indentLen <- indentLevel >>= \level -> optIndent >>= \opt -> return (level + length opt)
+  indentLen <- (+) <$> indentLevel <*> (length <$> optIndent)
 
   fence <- try (fenceOf '`') <|> fenceOf '~'
-  let fenceLen  = length fence
-      fenceChar = char $ head fence
-      fenceIndent = atMostN indentLen (char ' ')
+  let closingFence = manyN (length fence) (char $ head fence)
+      fenceIndent  = atMostN indentLen (char ' ')
 
   infoString <- manyTill infoChar lineEnding_
   content    <- manyTill
-                (fenceIndent >> manyTill anyChar lineEnding_)
-                (eof <|> (fenceIndent >> optIndent >> manyN fenceLen fenceChar >> lookAhead lineEnding_))
+                (fenceIndent *> manyTill anyChar lineEnding_)
+                (eof <|> try (fenceIndent *> optIndent *> closingFence *> lookAhead lineEnding_))
 
   return $ C.fenced infoString content
-  where fenceOf c    = manyN 3 (char c)
-        infoChar     = notFollowedBy (char '`') >> anyChar
+  where fenceOf c = manyN 3 (char c)
+        infoChar  = notFollowedBy (char '`') *> anyChar
 
 linkRef :: BlockParser C.DocElement
 linkRef = do
   optIndent
-  reference <- between (char '[') (char ']') (skipMany whitespace >> linkReference)
+  ref <- between (char '[') (char ']') (skipMany whitespace *> linkReference)
   char ':'
 
-  skipMany whitespace >> (optional $ lineEnding >> skipMany1 whitespace)
-  destination <- many1 printable
+  skipMany whitespace >> (optional $ lineEnding *> skipMany1 whitespace)
+  dest <- many1 printable
   skipMany whitespace
-  title <- option "" $ parseTitle <|> try (lineEnding_ >> skipMany1 whitespace >> parseTitle)
+  mtitle <- optionMaybe $ parseTitle <|> try (lineEnding *> skipMany1 whitespace *> parseTitle)
 
-  return $ C.linkReference
-            reference
-            destination
-            (if length title > 0 then Just title else Nothing)
-  where parseTitle = printable >>= \t -> manyTill anyChar (lookAhead lineEnding_) >>= return . (:) t
+  return $ C.linkReference ref dest mtitle
+  where parseTitle = (:) <$> printable <*> manyTill anyChar (lookAhead lineEnding_)
 
 paragraph :: BlockParser C.DocElement
-paragraph = do
-  content <- rawInline
-  return $ C.paragraphBlock content
+paragraph = C.paragraphBlock <$> rawInline
 
 blockquote :: BlockParser C.DocElement
-blockquote = do
-  optIndent
-  char '>' >> optional whitespace
-  skipMany whitespace
-  content <- block
-  return $ C.blockquoteBlock content
+blockquote = C.blockquoteBlock <$> (optIndent *> char '>' *> skipMany whitespace *> block)
 
 unorderedList :: BlockParser C.DocElement
 unorderedList = do
   optIndent
-
   bulletMarker
   spaces <- many1 whitespace
-
-  indent (1 + length spaces)
-  x <- block
-  xs <- many $ try $ lineEnding >> indented block
-  unindent
-
-  return $ C.unorderedList (x:xs)
+  C.unorderedList <$> listItem (1 + length spaces)
 
 orderedList :: BlockParser C.DocElement
 orderedList = do
   optIndent
-
   num <- orderedMarker
   spaces <- many1 whitespace
+  C.orderedList (read num) <$> listItem (length num + 1 + length spaces)
 
-  indent (length num + 1 + length spaces)
-  x <- block
-  xs <- many $ try $ lineEnding >> indented block
-  unindent
-
-  return $ C.orderedList (read num) (x:xs)
+listItem :: Int -> BlockParser C.Doc
+listItem indentAmount =
+  indent indentAmount *> ((:) <$> block <*> (many $ try $ lineEnding >> indented block)) <* unindent
 
 rawInline :: BlockParser String
 rawInline = manyTill anyChar (lookAhead lineEnding_)
@@ -197,15 +173,15 @@ runRules :: ParsingRules -> InlineParser ()
 runRules (Nothing)    = return ()
 runRules (Just rules) = rules
 
-infixl 7 >>+
-(>>+) :: ParsingRules -> InlineParser () -> ParsingRules
-(>>+) Nothing rule      = Just rule
-(>>+) (Just rules) rule = Just $ rules >> rule
+infixl 7 <+>
+(<+>) :: ParsingRules -> InlineParser () -> ParsingRules
+(<+>) Nothing rule      = Just rule
+(<+>) (Just rules) rule = Just $ rules *> rule
 
 type InlineParser = Parsec String A.LinkMap
 
 lookupLink :: String -> InlineParser (Maybe A.Link)
-lookupLink ref = getState >>= return . M.lookup ref
+lookupLink ref = M.lookup ref <$> getState
 
 parseInlines :: A.LinkMap -> [String] -> A.MarkdownInline
 parseInlines linkMap xs =
@@ -216,18 +192,20 @@ parseInlines linkMap xs =
 
 inline :: ParsingRules -> InlineParser A.MarkdownInline
 inline rules =
-  (eof >> return A.noInline)
+  (eof *> pure A.noInline)
   <|>
-  (do
-    xs <- many1 $ choice  [try codespan
-                          , try $ bold rules
-                          , try $ italic rules
-                          , try $ link rules
-                          , try $ image rules
-                          , try hardLineBreak
-                          , try escapedChar
-                          , try $ inlineText rules]
-    return $ foldr (A.<#>) A.noInline xs
+  (
+    foldr (A.<#>) A.noInline
+    <$> (many1 $ choice [
+          try codespan
+          , try $ bold rules
+          , try $ italic rules
+          , try $ link rules
+          , try $ image rules
+          , try hardLineBreak
+          , try escapedChar
+          , try $ inlineText rules
+        ])
   )
 
 codespan :: InlineParser A.MarkdownInline
@@ -237,24 +215,15 @@ codespan = do
   where codespanChar = (string "\\`" >> return '`') <|> noneOf "`"
 
 bold :: ParsingRules -> InlineParser A.MarkdownInline
-bold rules = do
-  xs <- try (flanked "**" "**" rules)
-        <|> flanked "__" "__" rules
-  return $ A.bold xs
+bold rules = A.bold <$> (try (flanked "**" "**" rules) <|> flanked "__" "__" rules)
 
 italic :: ParsingRules -> InlineParser A.MarkdownInline
-italic rules = do
-  xs <- try (flanked "*" "*" rules)
-        <|> flanked "_" "_" rules
-  return $ A.italic xs
+italic rules = A.italic <$> (try (flanked "*" "*" rules) <|> flanked "_" "_" rules)
 
 flanked :: String -> String -> ParsingRules -> InlineParser A.MarkdownInline
-flanked open close rules = do
-  string open
-  notFollowedBy whitespace
-  content <- inline $ rules >>+ notFollowedBy (string close)
-  string close
-  return $ content
+flanked open close rules =
+  string open *> notFollowedBy whitespace
+  *> (inline $ rules <+> notFollowedBy (string close)) <* string close
 
 link :: ParsingRules -> InlineParser A.MarkdownInline
 link rules = do
@@ -265,24 +234,17 @@ link rules = do
     _ -> unexpected "nested link"
 
 linkContent :: ParsingRules -> InlineParser A.MarkdownInline
-linkContent rules = do
-  char '['
-  content <- inline $ rules >>+ notFollowedBy (char ']')
-  char ']'
-  return $ content
+linkContent rules = char '[' *> (inline $ rules <+> notFollowedBy (char ']')) <* char ']'
 
 linkInfo :: InlineParser (String, Maybe String)
 linkInfo = inlineLink <|> referenceLink
-  where inlineLink    = do
+  where inlineLink =
           char '('
-          linkUrl <- linkDestination
-          linkTitle <- skipMany whitespace >> try (optionMaybe linkTitle)
-          skipMany whitespace
-          char ')'
-          return (linkUrl, linkTitle)
+          *> ((,) <$> linkDestination <*> (skipMany whitespace *> try (optionMaybe linkTitle)))
+          <* skipMany whitespace <* char ')'
         referenceLink = do
           char '['
-          linkRef <- liftM trim $ skipMany whitespace >> linkReference
+          linkRef <- liftM trim $ skipMany whitespace *> linkReference
           char ']'
           mlink <- lookupLink (map toLower . trim $ linkRef)
           case mlink of
@@ -290,45 +252,24 @@ linkInfo = inlineLink <|> referenceLink
             Just (linkUrl, linkTitle) -> return (linkUrl, linkTitle)
 
 image :: ParsingRules-> InlineParser A.MarkdownInline
-image rules = do
-  char '!'
-  linkText <- linkContent rules
-  (linkUrl, linkTitle) <- linkInfo
-  return $ A.image linkText linkUrl linkTitle
+image rules = char '!' *> (uncurry <$> (A.image <$> linkContent rules) <*> linkInfo)
 
 hardLineBreak :: InlineParser A.MarkdownInline
-hardLineBreak = do
-  try (manyN 2 whitespace >> lookAhead lineEnding_) <|> (char '\\' >> lookAhead lineEnding_)
-  return A.HardLineBreak
-
--- matchingInline :: InlineParser A.MarkdownInline
--- matchingInline = do
---   match <- matching
---   return $ A.text match
-
--- matching :: Parsec String u String
--- matching = do
---   open <- char '(' <|> char '[' <|> char '{'
---   cs <- matching' open
---   return (open:cs)
---   where closing '(' = ')'
---         closing '[' = ']'
---         closing '{' = '}'
---         matching' :: Char -> Parsec String u String
---         matching' open = (char (closing open) >>= return . (:[]))
---                     <|> (anyChar >>= \c -> matching' open >>= \cs -> return (c:cs))
+hardLineBreak =
+  (try (manyN 2 whitespace *> lookAhead lineEnding_) <|> (char '\\' *> lookAhead lineEnding_))
+  *> pure A.hardLineBreak
 
 escapedChar :: InlineParser A.MarkdownInline
-escapedChar =  (notFollowedBy lineEnding >> escaped) >>= return . A.text . (:[])
+escapedChar = A.text . (:[]) <$> (notFollowedBy lineEnding *> escaped)
   where escaped :: InlineParser Char
-        escaped = char '\\' >> satisfy isPunctuation
+        escaped = char '\\' *> satisfy isPunctuation
 
 inlineText :: ParsingRules -> InlineParser A.MarkdownInline
 inlineText rules =
+  A.text <$>
   manyTill1
-  (runRules rules >> anyChar)
+  (runRules rules *> anyChar)
   (lineEnding_ <|> (void $ lookAhead $ oneOf "`*_[]\\"))
-  >>= return . A.text
 
 fromDoc :: A.LinkMap -> C.Doc -> A.Markdown
 fromDoc linkMap = map (fromDocElement linkMap)

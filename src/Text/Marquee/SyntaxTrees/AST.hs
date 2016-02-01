@@ -65,6 +65,12 @@ infixr 5 </>
 noInline :: MarkdownInline
 noInline = NoInline
 
+lineBreak :: MarkdownInline
+lineBreak = LineBreak
+
+hardLineBreak :: MarkdownInline
+hardLineBreak = HardLineBreak
+
 text :: String -> MarkdownInline
 text = Text
 

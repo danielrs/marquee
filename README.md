@@ -12,7 +12,7 @@ The lexer and parser follow most of the rules outlined at *CommonMark*, however,
 
 1. Raw HTML parsing; nothing implemented until now.
 
-2. Optimize the parser for less backtracking.
+2. Optimize the parser
 
 ### Structure of the library
 
