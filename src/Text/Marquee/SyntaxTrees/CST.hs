@@ -3,6 +3,7 @@ module Text.Marquee.SyntaxTrees.CST where
 import Control.Arrow (second)
 import qualified Data.ByteString.Char8 as B
 import Data.Char (toLower)
+import Data.List (dropWhileEnd)
 
 import Data.ByteString.Marquee
 import Data.List.Marquee

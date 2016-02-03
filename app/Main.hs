@@ -95,7 +95,7 @@ outputHtml options input output = do
   markdown <- B.hGetContents input
 
   let writer =  if htmlPage options
-                  then writeHtmlDocument (maybe "" id (htmlTitle options)) (htmlCss options)
+                  then writeHtmlDocument (fromMaybe "" (htmlTitle options)) (htmlCss options)
                   else writeHtml
       ast  = renderAST markdown
       html = renderHtml . writer $ ast
