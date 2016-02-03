@@ -8,7 +8,7 @@ sourceMarkdown :: String
 sourceMarkdown = "app/minimal.md"
 
 sourceCss :: String
-sourceCss = "app/minimal.css"
+sourceCss = "minimal.css" -- relative to generated html
 
 targetHtml :: String
 targetHtml = "app/minimal.html"
