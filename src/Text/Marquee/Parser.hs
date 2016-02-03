@@ -38,11 +38,11 @@ fromDoc linkMap = map (fromDocElement linkMap)
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement
 fromDocElement linkMap C.BlankLine             = A.BlankLine
 fromDocElement linkMap C.ThematicBreak         = A.ThematicBreak
-fromDocElement linkMap (C.Heading n xs)        = A.Heading n (parseInlines linkMap xs)
+fromDocElement linkMap (C.Heading n xs)        = A.Heading n (parseInline linkMap $ B.intercalate "\n" xs)
 fromDocElement linkMap (C.HeadingUnderline _)  = A.ThematicBreak
 fromDocElement linkMap (C.IndentedBlock xs)    = A.Indented xs
 fromDocElement linkMap (C.Fenced info xs)      = A.Fenced info xs
-fromDocElement linkMap (C.ParagraphBlock xs)   = A.Paragraph (parseInlines linkMap xs)
+fromDocElement linkMap (C.ParagraphBlock xs)   = A.Paragraph (parseInline linkMap $ B.intercalate "\n" xs)
 fromDocElement linkMap (C.LinkReference _ _ _) = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)  = A.Blockquote $ map (fromDocElement linkMap) xs
 fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDoc linkMap) xs
@@ -148,14 +148,16 @@ blockquote = C.blockquoteBlock <$> (lift (optIndent *> char '>' *> skipWhile isW
 
 unorderedList :: BlockParser C.DocElement
 unorderedList = do
-  spaces <- lift $ optIndent *> bulletMarker *> takeWhile1 isWhitespace
-  C.unorderedList <$> listItem (1 + B.length spaces)
+  indent <- lift $ length <$> optIndent <* bulletMarker
+  spaces <- lift $ B.length <$> takeWhile1 isWhitespace
+  C.unorderedList <$> listItem (indent + 1 + spaces)
 
 orderedList :: BlockParser C.DocElement
 orderedList = do
-  num <- lift $ optIndent *> orderedMarker
-  spaces <- lift $ takeWhile1 isWhitespace
-  C.orderedList (read num) <$> listItem (length num + 1 + B.length spaces)
+  indent <- lift $ length <$> optIndent
+  num <- lift orderedMarker
+  spaces <- lift $ B.length <$> takeWhile1 isWhitespace
+  C.orderedList (read num) <$> listItem (indent + length num + 1 + spaces)
 
 listItem :: Int -> BlockParser C.Doc
 listItem indentAmount =
@@ -180,11 +182,11 @@ infixl 7 <+>
 lookupLink :: B.ByteString -> InlineParser (Maybe A.Link)
 lookupLink ref = M.lookup (trim ref) <$> get
 
-parseInlines :: A.LinkMap -> [B.ByteString] -> A.MarkdownInline
-parseInlines linkMap xs =
-  case sequence $ map (parse $ inline Nothing) xs of
-    Left err -> A.noInline
-    Right val -> foldr (A.</>) A.noInline . map fst $ val
+parseInline :: A.LinkMap -> B.ByteString -> A.MarkdownInline
+parseInline linkMap x =
+  case parse (inline Nothing) x of
+    Left err   -> A.noInline
+    Right val  -> fst val
   where parse p = parseOnly (runStateT p linkMap)
 
 inline :: IgnoredChars -> InlineParser A.MarkdownInline
@@ -199,6 +201,7 @@ inline ignored =
           , link ignored
           , image ignored
           , hardLineBreak
+          , softLineBreak
           , escapedChar
           , inlineText ignored
         ])
@@ -250,8 +253,11 @@ linkInfo = inlineLink <|> referenceLink
 
 hardLineBreak :: InlineParser A.MarkdownInline
 hardLineBreak = lift $
-  ((count 2 whitespace *> next (lookAhead lineEnding_)) <|> (char '\\' *> lookAhead lineEnding_))
+  ((count 2 whitespace *> lineEnding_) <|> (char '\\' *> lineEnding_))
   *> pure A.hardLineBreak
+
+softLineBreak :: InlineParser A.MarkdownInline
+softLineBreak = lift $ lineEnding *> pure A.softLineBreak
 
 escapedChar :: InlineParser A.MarkdownInline
 escapedChar = lift $ A.text . ((flip B.cons) B.empty) <$> escaped
@@ -262,7 +268,7 @@ inlineText ignored = lift $ do
   x <- satisfy (\c -> not $ isIgnored c ignored)
   xs <- takeTill (flip elem special)
   return $ A.text (B.cons x xs)
-  where special = "`*_[]\\" :: String
+  where special = "`*_[]!\n\\" :: String
 
 -- -- USEFUL DEFINITIONS
 

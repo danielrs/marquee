@@ -54,20 +54,14 @@ infixr 5 <#>
 (<#>) :: MarkdownInline -> MarkdownInline -> MarkdownInline
 (<#>) = cons
 
-consLines :: MarkdownInline -> MarkdownInline -> MarkdownInline
-consLines x NoInline = x
-consLines NoInline y = y
-consLines a b        = cons a (cons LineBreak b)
-
-infixr 5 </>
-(</>) :: MarkdownInline -> MarkdownInline -> MarkdownInline
-(</>) = consLines
-
 noInline :: MarkdownInline
 noInline = NoInline
 
 lineBreak :: MarkdownInline
 lineBreak = LineBreak
+
+softLineBreak :: MarkdownInline
+softLineBreak = LineBreak
 
 hardLineBreak :: MarkdownInline
 hardLineBreak = HardLineBreak

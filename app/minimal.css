@@ -13,8 +13,19 @@ body {
 }
 
 h1, h2, h3, h4 {
-	margin: 2em 0;
+	margin: 1.5em 0;
 	font-family: 'Lato', sans-serif;
+}
+
+h1, h2 {
+	padding-bottom: .75em;
+	border-bottom: 1px solid #dedede;
+}
+
+hr {
+	height: .25em;
+	border: none;
+	background: #eee;
 }
 
 code {
@@ -27,6 +38,7 @@ pre {
 	margin-bottom: 1em;
 	font-size: 1.25em;
 	background: #eee;
+	overflow-x: scroll;
 }
 
 blockquote {
