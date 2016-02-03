@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Text.Marquee.Parser where
+module Text.Marquee.Parser (renderCST, renderAST) where
 
 -- Control imports
 import Control.Arrow (first, second)

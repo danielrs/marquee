@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Text.Marquee.Writers.HTML (writeHtml, renderHtml) where
+module Text.Marquee.Writers.HTML (renderHtml, writeHtml, writeHtmlDocument) where
 
 -- Control and Data imports
 import Control.Monad (forM_)
@@ -20,7 +20,17 @@ renderHtml :: Html -> String
 renderHtml = H.renderHtml
 
 writeHtml :: Markdown -> Html
-writeHtml = docTypeHtml . writeHtml'
+writeHtml = writeHtml'
+
+writeHtmlDocument :: String -> Maybe String -> Markdown -> Html
+writeHtmlDocument title Nothing md = docTypeHtml $ do
+  H.head . H.title . toHtml $ title
+  H.body . writeHtml' $ md
+writeHtmlDocument title (Just cssFile) md = docTypeHtml $ do
+  H.head $ do
+    H.title . toHtml $ title
+    H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! (A.href . toValue $ cssFile)
+  H.body . writeHtml' $ md
 
 writeHtml' []     = return ()
 writeHtml' (x:xs) = writeElement x >> writeHtml' xs

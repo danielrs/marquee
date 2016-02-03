@@ -3,7 +3,7 @@
 
 name:                marquee
 version:             0.1.0.0
-synopsis:            A Github Flavored Markdown (GFM) parser
+synopsis:            Markdown transpiler
 -- description:
 license:             MIT
 license-file:        LICENSE
@@ -21,17 +21,16 @@ library
   default-language:     Haskell2010
   build-depends:        base >=4.8 && <4.9
                         , bytestring >= 0.9.2.1
-                        , word8 >= 0.1.2
                         , attoparsec >= 0.13.0.1
                         , blaze-html >= 0.8.1.1
-                        , containers
-                        , mtl
+                        , containers >= 0.5.7.1
+                        , mtl >= 2.2.1
   exposed-modules:      Text.Marquee
-                        , Text.Marquee.Writers.HTML
   other-modules:        Data.ByteString.Marquee
                         , Data.List.Marquee
                         , Text.Marquee.SyntaxTrees.AST
                         , Text.Marquee.SyntaxTrees.CST
+                        , Text.Marquee.Writers.HTML
                         , Text.Marquee.Parser
 
 executable marquee
@@ -39,4 +38,10 @@ executable marquee
   build-depends:  base >=4.8 && <4.9
                   , bytestring >= 0.9.2.1
                   , marquee
+                  , optparse-applicative >= 0.12.1.0
 
+executable minimal
+  main-is: app/Minimal.hs
+  build-depends:  base >=4.8 && <4.9
+                  , bytestring >= 0.9.2.1
+                  , marquee
