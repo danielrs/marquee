@@ -1,19 +1,20 @@
 module Main where
 
-import Data.List
-import System.IO
+import qualified Data.ByteString as B
 
 import Text.Marquee
 import Text.Marquee.Writers.HTML
 
 main = do
-  md <- readFile "app/test.md"
+  md <- B.readFile "app/test.md"
+  let cst = renderCST md
+      ast = renderAST md
 
   -- Show AST
   putStrLn "\n-- RESULT --\n"
-  mapM_ (putStrLn . show) $ renderCST $ concat $ replicate 1 md
+  mapM_ (putStrLn . show) ast
   putStrLn "\n-- END OF RESULT --\n"
 
   -- Write HTML
-  let html = renderHtml . writeHtml . renderAST $ concat $ replicate 1 md
+  let html = renderHtml . writeHtml $ ast
   writeFile "app/test.html" html

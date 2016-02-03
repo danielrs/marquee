@@ -151,7 +151,7 @@ just like the links to [**slack**][slack] and [**facebook**][facebook].
 
 # Images
 
-Here's the Haskell logo [![this is the alt text with some **style** and [links][google]][HASKELL logo]][haskell] and GitHub's Octocat [![octocat][octocat]][github]
+Here's the Haskell logo [![this is the alt text with some **style** and [links][google]][haskell logo]][haskell] and GitHub's Octocat [![octocat][octocat]][github]
 
 # Line breaks
 

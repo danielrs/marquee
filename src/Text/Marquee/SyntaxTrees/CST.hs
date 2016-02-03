@@ -1,9 +1,10 @@
 module Text.Marquee.SyntaxTrees.CST where
 
 import Control.Arrow (second)
+import qualified Data.ByteString.Char8 as B
 import Data.Char (toLower)
 
-import Data.String.Marquee
+import Data.ByteString.Marquee
 import Data.List.Marquee
 
 type Doc = [DocElement]
@@ -11,12 +12,12 @@ type Doc = [DocElement]
 data DocElement = BlankLine
                   -- Leaf blocks
                   | ThematicBreak
-                  | Heading Int [String]
+                  | Heading Int [B.ByteString]
                   | HeadingUnderline Int
-                  | IndentedBlock [String]
-                  | Fenced String [String]
-                  | ParagraphBlock [String]
-                  | LinkReference String String (Maybe String)
+                  | IndentedBlock [B.ByteString]
+                  | Fenced B.ByteString [B.ByteString]
+                  | ParagraphBlock [B.ByteString]
+                  | LinkReference B.ByteString B.ByteString (Maybe B.ByteString)
                   -- Container blocks
                   | BlockquoteBlock [DocElement]
                   | UListBlock [Doc]
@@ -31,23 +32,23 @@ blankLine = BlankLine
 thematicBreak :: DocElement
 thematicBreak = ThematicBreak
 
-heading :: Int -> String -> DocElement
+heading :: Int -> B.ByteString -> DocElement
 heading depth str = Heading depth [trim str]
 
 headingUnderline :: Int -> DocElement
 headingUnderline = HeadingUnderline
 
-indentedBlock :: String -> DocElement
+indentedBlock :: B.ByteString -> DocElement
 indentedBlock = IndentedBlock . (:[])
 
-fenced :: String -> [String] -> DocElement
+fenced :: B.ByteString -> [B.ByteString] -> DocElement
 fenced info = Fenced (trim info)
 
-paragraphBlock :: String -> DocElement
+paragraphBlock :: B.ByteString -> DocElement
 paragraphBlock = ParagraphBlock . (:[])
 
-linkReference :: String -> String -> Maybe String -> DocElement
-linkReference ref url title = LinkReference (map toLower . trim $ ref) (trim url) (trim <$> title)
+linkReference :: B.ByteString -> B.ByteString -> Maybe B.ByteString -> DocElement
+linkReference ref url title = LinkReference (trim ref) (trim url) (trim <$> title)
 
 blockquoteBlock :: DocElement -> DocElement
 blockquoteBlock = BlockquoteBlock . (:[])
@@ -69,8 +70,8 @@ group []                                               = []
 group (IndentedBlock x : IndentedBlock y : xs)        = group $ IndentedBlock (x ++ y) : xs
 
 group (ParagraphBlock x : ParagraphBlock y : xs)      = group $ ParagraphBlock (x ++ y) : xs
-group (ParagraphBlock x : HeadingUnderline 1 : xs)    = Heading 1 (lines . trim . unlines $ x) : group xs
-group (ParagraphBlock x : HeadingUnderline 2 : xs)    = Heading 2 (lines . trim . unlines $ x) : group xs
+group (ParagraphBlock x : HeadingUnderline 1 : xs)    = Heading 1 (B.lines . trim . B.unlines $ x) : group xs
+group (ParagraphBlock x : HeadingUnderline 2 : xs)    = Heading 2 (B.lines . trim . B.unlines $ x) : group xs
 
 group (BlockquoteBlock x : BlockquoteBlock y : xs)    = group $ BlockquoteBlock (x ++ y) : xs
 group (BlockquoteBlock x : y@(ParagraphBlock _) : xs) = group $ BlockquoteBlock (x ++ [y]) : xs
@@ -87,7 +88,3 @@ group (x:xs)                                          = x : group xs
 
 trimDoc :: Doc -> Doc
 trimDoc = dropWhileEnd (== BlankLine) . dropWhile (== BlankLine)
-
-trimElement :: DocElement -> DocElement
-trimElement (ParagraphBlock xs) = ParagraphBlock . lines . trim . unlines $ xs
-trimElement x = x
