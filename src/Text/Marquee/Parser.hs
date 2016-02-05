@@ -9,7 +9,7 @@ import Control.Monad
 import Control.Monad.State (StateT(..), get, modify, lift)
 
 -- Data imports
-import Data.Char (isControl, isPunctuation)
+import Data.Char (isControl, isPunctuation, isSymbol)
 import qualified Data.ByteString.Char8 as B
 import qualified Data.Map as M (lookup)
 import qualified Data.Set as S
@@ -36,17 +36,17 @@ fromDoc :: A.LinkMap -> C.Doc -> A.Markdown
 fromDoc linkMap = map (fromDocElement linkMap)
 
 fromDocElement :: A.LinkMap -> C.DocElement -> A.MarkdownElement
-fromDocElement linkMap C.BlankLine             = A.BlankLine
-fromDocElement linkMap C.ThematicBreak         = A.ThematicBreak
-fromDocElement linkMap (C.Heading n xs)        = A.Heading n (parseInline linkMap $ B.intercalate "\n" xs)
-fromDocElement linkMap (C.HeadingUnderline _)  = A.ThematicBreak
-fromDocElement linkMap (C.IndentedBlock xs)    = A.Indented xs
-fromDocElement linkMap (C.Fenced info xs)      = A.Fenced info xs
-fromDocElement linkMap (C.ParagraphBlock xs)   = A.Paragraph (parseInline linkMap $ B.intercalate "\n" xs)
-fromDocElement linkMap (C.LinkReference _ _ _) = A.BlankLine
-fromDocElement linkMap (C.BlockquoteBlock xs)  = A.Blockquote $ map (fromDocElement linkMap) xs
-fromDocElement linkMap (C.UListBlock xs)       = A.UnorderedList $ map (fromDoc linkMap) xs
-fromDocElement linkMap (C.OListBlock xs)       = A.OrderedList $ map (second $ fromDoc linkMap) xs
+fromDocElement linkMap C.BlankLine              = A.BlankLine
+fromDocElement linkMap C.ThematicBreak          = A.ThematicBreak
+fromDocElement linkMap (C.Heading n xs)         = A.Heading n (parseInline linkMap $ B.intercalate "\n" xs)
+fromDocElement linkMap (C.HeadingUnderline _ _) = A.ThematicBreak
+fromDocElement linkMap (C.IndentedBlock xs)     = A.Indented xs
+fromDocElement linkMap (C.Fenced info xs)       = A.Fenced info xs
+fromDocElement linkMap (C.ParagraphBlock xs)    = A.Paragraph (parseInline linkMap $ B.intercalate "\n" xs)
+fromDocElement linkMap (C.LinkReference _ _ _)  = A.BlankLine
+fromDocElement linkMap (C.BlockquoteBlock xs)   = A.Blockquote $ map (fromDocElement linkMap) xs
+fromDocElement linkMap (C.UListBlock xs)        = A.UnorderedList $ map (fromDoc linkMap) xs
+fromDocElement linkMap (C.OListBlock xs)        = A.OrderedList $ map (second $ fromDoc linkMap) xs
 
 -- Types
 
@@ -84,9 +84,10 @@ block = choice [
   ]
 
 indented :: BlockParser C.DocElement -> BlockParser C.DocElement
-indented p =
-  indentLevel >>= \level ->
-  optional (blankLine >> lift lineEnding) >> count level (lift whitespace) >> p
+indented p = do
+  (blankLine >> lift lineEnding >> blankLine >> lift lineEnding >> return C.blankLine)
+  <|>
+  (blankLine <|> (indentLevel >>= \level -> count level (lift whitespace) >> p))
 
 blankLine :: BlockParser C.DocElement
 blankLine = lift $ next (lookAhead lineEnding_) *> return C.blankLine
@@ -94,23 +95,23 @@ blankLine = lift $ next (lookAhead lineEnding_) *> return C.blankLine
 headingUnderline :: BlockParser C.DocElement
 headingUnderline = lift $ do
   optIndent
-  (c:_) <- setextOf '=' <|> setextOf '-'
-  return $ C.headingUnderline (if c == '=' then 1 else 2)
-  where setextOf c = manyN 3 (char c) <* next (lookAhead lineEnding_)
+  cs@(c:_) <- setextOf 1 '=' <|> setextOf 2 '-'
+  return $ C.headingUnderline (if c == '=' then 1 else 2) (B.pack cs)
+  where setextOf n c = manyN n (char c) <* next (lookAhead lineEnding_)
 
 thematicBreak :: BlockParser C.DocElement
 thematicBreak = lift $ do
   optIndent
-  thematicBreakOf '*' <|> thematicBreakOf '-' <|> thematicBreakOf '_'
+  thematicBreakOf '-' <|> thematicBreakOf '_' <|> thematicBreakOf '*'
   return C.thematicBreak
-  where thematicBreakOf c = manyN 3 (next $ char c) <* next (lookAhead lineEnding_)
+  where thematicBreakOf c = manyN 3 (char c <* skipWhile isWhitespace) <* next (lookAhead lineEnding_)
 
 heading :: BlockParser C.DocElement
 heading = lift $ do
   optIndent
   pounds <- atMostN1 6 (char8 '#')
-  void whitespace <|> lookAhead lineEnding_
-  content <- rawInline
+  lookAhead (void whitespace) <|> lookAhead lineEnding_
+  content <- headingInline (length pounds)
   return $ C.heading (length pounds) content
 
 indentedLine :: BlockParser C.DocElement
@@ -133,7 +134,7 @@ fenced = do
 linkRef :: BlockParser C.DocElement
 linkRef = lift $ do
   optIndent
-  ref    <- linkReference <* char8 ':'
+  ref    <- linkLabel <* char8 ':'
   dest   <- spacing *> linkDestination
   mtitle <- (optionMaybe $ spacing *> linkTitle) <* next (lookAhead lineEnding_)
 
@@ -165,6 +166,11 @@ listItem indentAmount =
 
 rawInline :: Parser B.ByteString
 rawInline = Atto.takeTill isLineEnding
+
+headingInline :: Int -> Parser B.ByteString
+headingInline headingSize = do
+  xs <- manyTill anyChar (lookAhead $ lineEnding <|> (whitespace >> many (char '#') >> lineEnding_))
+  return $ B.pack xs
 
 -- -- CST to AST and parsing inlines
 
@@ -209,11 +215,15 @@ inline ignored =
 
 codespan :: InlineParser A.MarkdownInline
 codespan = lift $ do
-  open <- takeWhile1 (== '`')
-  (A.codespan <$> codespanStr <* string open) <|> (pure $ A.text open)
-  where codespanStr = scan [] scanf
-        scanf ('\\':cs) c@'`' = Just (c:cs)
-        scanf cs c = if c /= '`' then Just (c:cs) else Nothing
+  open <- Atto.takeWhile1 (== '`')
+  let noCodespan = return . A.text $ open
+      closing = string open >> lookAhead (void (notChar '`') <|> endOfInput)
+      codespan' = A.codespan . B.concat <$> manyTill codespanStr closing
+      codespanStr = Atto.takeWhile1 (/= '`')
+                    <|> (Atto.takeWhile1 (== '`') >>= \ticks ->
+                        if B.length ticks == B.length open  then fail "Found closing codespan"
+                                                            else return ticks)
+  codespan' <|> noCodespan
 
 em :: IgnoredChars -> InlineParser A.MarkdownInline
 em ignored = A.em <$> (flanked '*' '*' ignored <|> flanked '_' '_' ignored)
@@ -224,36 +234,47 @@ em ignored = A.em <$> (flanked '*' '*' ignored <|> flanked '_' '_' ignored)
           <* lift (char close)
 
 link :: IgnoredChars -> InlineParser A.MarkdownInline
-link ignored = do
-  linkText <- linkContent ignored
-  (linkUrl, linkTitle) <- linkInfo
-  case A.containsLink linkText of
-    False -> return $ A.Link linkText linkUrl linkTitle
-    _ -> fail "nested link"
+link ignored = fullLink <|> simpleLink
+  where fullLink = do
+          linkText <- linkContent ignored
+          (_, linkUrl, linkTitle) <- linkInfo
+          case A.containsLink linkText of
+            False -> return $ A.link linkText linkUrl linkTitle
+            _ -> fail "nested link"
+        simpleLink = do
+          (linkRef, linkUrl, linkTitle) <- linkRefInfo
+          return $ A.link (A.text linkRef) linkUrl linkTitle
 
 image :: IgnoredChars-> InlineParser A.MarkdownInline
-image ignored = lift (char '!') *> (uncurry <$> (A.image <$> linkContent ignored) <*> linkInfo)
+image ignored = do
+  lift (char '!')
+  A.Link content url title <- link ignored
+  return $ A.image content url title
 
 linkContent :: IgnoredChars -> InlineParser A.MarkdownInline
 linkContent ignored =
   lift (char '[') *> (inline $ ignored <+> ']') <* lift (char ']')
 
-linkInfo :: InlineParser (B.ByteString, Maybe B.ByteString)
-linkInfo = inlineLink <|> referenceLink
-  where inlineLink = lift $ do
-          dest <- char '(' *> skipWhile isWhitespace *> linkDestination
-          title <- skipWhile isWhitespace *> optionMaybe linkTitle <* skipWhile isWhitespace <* char ')'
-          return $ (dest, title)
-        referenceLink = do
-          linkRef <- lift linkReference
-          mlink <- lookupLink linkRef
-          case mlink of
-            Nothing -> fail $ "Link reference: " ++ B.unpack linkRef ++ ", not found"
-            Just (linkUrl, linkTitle) -> return (linkUrl, linkTitle)
+linkInfo :: InlineParser (B.ByteString, B.ByteString, Maybe B.ByteString)
+linkInfo = linkInlineInfo <|> linkRefInfo
+
+linkInlineInfo :: InlineParser (B.ByteString, B.ByteString, Maybe B.ByteString)
+linkInlineInfo = lift $ do
+  dest <- char '(' *> skipWhile isWhitespace *> linkDestination
+  title <- skipWhile isWhitespace *> optionMaybe linkTitle <* skipWhile isWhitespace <* char ')'
+  return $ (B.empty, dest, title)
+
+linkRefInfo :: InlineParser (B.ByteString, B.ByteString, Maybe B.ByteString)
+linkRefInfo = do
+  linkRef <- lift linkLabel
+  mlink <- lookupLink linkRef
+  case mlink of
+    Nothing -> fail $ "Link reference: " ++ B.unpack linkRef ++ ", not found"
+    Just (linkUrl, linkTitle) -> return (linkRef, linkUrl, linkTitle)
 
 hardLineBreak :: InlineParser A.MarkdownInline
 hardLineBreak = lift $
-  ((count 2 whitespace *> lineEnding_) <|> (char '\\' *> lineEnding_))
+  ((count 2 whitespace *> lineEnding) <|> (char '\\' *> lineEnding))
   *> pure A.hardLineBreak
 
 softLineBreak :: InlineParser A.MarkdownInline
@@ -261,7 +282,7 @@ softLineBreak = lift $ lineEnding *> pure A.softLineBreak
 
 escapedChar :: InlineParser A.MarkdownInline
 escapedChar = lift $ A.text . ((flip B.cons) B.empty) <$> escaped
-  where escaped = char '\\' *> satisfy isPunctuation
+  where escaped = char '\\' *> satisfy (\c -> isPunctuation c || isSymbol c)
 
 inlineText :: IgnoredChars -> InlineParser A.MarkdownInline
 inlineText ignored = lift $ do
@@ -293,8 +314,8 @@ punctuation = satisfy isPunctuation
 control :: Parser Char
 control = satisfy isControl
 
-linkReference :: Parser B.ByteString
-linkReference = between (char8 '[') (char8 ']') (Atto.takeWhile1 (\c -> c /= ']'))
+linkLabel :: Parser B.ByteString
+linkLabel = between (char8 '[') (char8 ']') (Atto.takeWhile1 (\c -> c /= ']'))
 
 linkDestination :: Parser B.ByteString
 linkDestination = Atto.takeWhile1 (\c -> not $ isSpace c || isControl c || c == '(' || c == ')')

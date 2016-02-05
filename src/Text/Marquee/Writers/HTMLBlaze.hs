@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Text.Marquee.Writers.HTML (renderHtml, writeHtml, writeHtmlDocument) where
+module Text.Marquee.Writers.HTMLBlaze (renderHtml, writeHtml, writeHtmlDocument) where
 
 -- Control and Data imports
 import Control.Monad (forM_)
@@ -47,17 +47,19 @@ writeElement (OrderedList x)   = ol $ forM_ x (li . writeHtml' . snd)
 writeElement _                 = return ()
 
 writeInline :: MarkdownInline -> Html
-writeInline (HardLineBreak)           = br
-writeInline (LineBreak)               = toHtml (" " :: String)
-writeInline (Text x)                  = toHtml' x
-writeInline (Codespan x)              = code . toHtml' $ x
-writeInline (Bold x)                  = strong $ writeInline x
-writeInline (Italic x)                = em $ writeInline x
-writeInline (Link x url Nothing)      = (a $ writeInline x) ! href (toValue' url)
-writeInline (Link x url (Just title)) = (a $ writeInline x) ! href (toValue' url) ! A.title (toValue' title)
-writeInline (Image x dest mtitle)     = img ! alt (toValue' . plain $ x) ! src (toValue' dest)
-writeInline (Cons x y)                = writeInline x >> writeInline y
-writeInline _                         = return ()
+writeInline (HardLineBreak)       = br
+writeInline (LineBreak)           = toHtml (" " :: String)
+writeInline (Text x)              = toHtml' x
+writeInline (Codespan x)          = code . toHtml' $ x
+writeInline (Bold x)              = strong $ writeInline x
+writeInline (Italic x)            = em $ writeInline x
+writeInline (Link x dest mtitle)  =
+  let url   = toValue' dest
+      title = toValue' $ maybe dest id mtitle
+  in  (a $ writeInline x) ! href url ! alt title
+writeInline (Image x dest mtitle) = img ! alt (toValue' . plain $ x) ! src (toValue' dest)
+writeInline (Cons x y)            = writeInline x >> writeInline y
+writeInline _                     = return ()
 
 codeblock :: B.ByteString -> [B.ByteString] -> Html
 codeblock info xs = codeblock' (B.unpack info) (B.unpack $ B.intercalate "\n" xs)
