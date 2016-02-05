@@ -321,8 +321,9 @@ linkDestination :: Parser B.ByteString
 linkDestination = Atto.takeWhile1 (\c -> not $ isSpace c || isControl c || c == '(' || c == ')')
 
 linkTitle :: Parser B.ByteString
-linkTitle =  titleOf '"' <|> titleOf '\'' <|> Atto.takeWhile1 (\c -> isPrintable c && c /= '(' && c /= ')')
-  where titleOf x = char x *> Atto.takeWhile (\c -> c /= x) <* char x
+linkTitle = titleOf '"' <|> titleOf '\'' <|> takeWhile1 isPrintable
+  where titleOf :: Char -> Char -> Parser B.ByteString
+        titleOf x = B.pack <$> between (char x) (char x) (many $ escaped x <|> notChar x)
 
 bulletMarker :: Parser Char
 bulletMarker = oneOf "-+*"
@@ -334,6 +335,9 @@ next :: Parser a -> Parser a
 next p = skipWhile isWhitespace *> p
 
 -- USEFUL COMBINATORS
+
+escaped :: Char -> Parser Char
+escaped c = char '\\' *> char c
 
 oneOf :: [Char] -> Parser Char
 oneOf cs = satisfy (\c -> c `elem` cs)
