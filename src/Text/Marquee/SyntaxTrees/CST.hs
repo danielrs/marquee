@@ -65,37 +65,43 @@ orderedList n = OListBlock . (:[]) . (,) n
 clean :: Doc -> Doc
 clean = trimDoc . group
 
-group ::  Doc -> Doc
-group []                                                   = []
-
-group (x : BlankLine : BlankLine : xs)                     = group $ x : BlankLine : xs
-
-group (HeadingUnderline 2 x : xs) | T.length x >= 3        = ThematicBreak : group xs
-group (HeadingUnderline _ x : xs)                          = group $ ParagraphBlock [x] : xs
-
-group (IndentedBlock x : IndentedBlock y : xs)             = group $ IndentedBlock (x ++ y) : xs
-group (IndentedBlock x : BlankLine : IndentedBlock y : xs) = group $ IndentedBlock (x ++ y) : xs
-
-group (ParagraphBlock x : HeadingUnderline 1 _ : xs)       = Heading 1 (trim' x) : group xs
-group (ParagraphBlock x : HeadingUnderline 2 _ : xs)       = Heading 2 (trim' x) : group xs
-group (ParagraphBlock x : IndentedBlock y : xs)            = group $ ParagraphBlock (x ++ y) : xs
-group (ParagraphBlock x : ParagraphBlock y : xs)           = group $ ParagraphBlock (x ++ y) : xs
-
-group (BlockquoteBlock x : BlockquoteBlock y : xs)         = group $ BlockquoteBlock (x ++ y) : xs
-group (BlockquoteBlock x : y@(ParagraphBlock _) : xs)      = group $ BlockquoteBlock (x ++ [y]) : xs
-group (BlockquoteBlock x : xs)                             = BlockquoteBlock (clean x) : group xs
-
-group (UListBlock x : UListBlock y : xs)                   = group $ UListBlock (x ++ y) : xs
-group (UListBlock x : BlankLine : UListBlock y : xs)       = group $ UListBlock (x ++ y) : xs
-group (UListBlock x : xs)                                  = UListBlock (map clean x) : group xs
-group (OListBlock x : OListBlock y : xs)                   = group $ OListBlock (x ++ y) : xs
-group (OListBlock x : BlankLine : OListBlock y : xs)       = group $ OListBlock (x ++ y) : xs
-group (OListBlock x : xs)                                  = OListBlock (map (second clean) x) : group xs
-
-group (x:xs)                                               = x : group xs
-
 trimDoc :: Doc -> Doc
 trimDoc = dropWhileEnd (== BlankLine) . dropWhile (== BlankLine)
 
 trim' :: [Text] -> [Text]
 trim' = T.lines . trim . T.unlines
+
+-- grouping
+
+group ::  Doc -> Doc
+group []                                                   = []
+
+group (HeadingUnderline 2 x : xs) | T.length x >= 3   = ThematicBreak : group xs
+group (HeadingUnderline _ x : xs)                     = group $ ParagraphBlock [x] : xs
+
+group xs@(IndentedBlock _ : _)                        = groupIndented xs
+
+group (ParagraphBlock x : HeadingUnderline 1 _ : xs)  = Heading 1 (trim' x) : group xs
+group (ParagraphBlock x : HeadingUnderline 2 _ : xs)  = Heading 2 (trim' x) : group xs
+group (ParagraphBlock x : IndentedBlock y : xs)       = group $ ParagraphBlock (x ++ y) : xs
+group (ParagraphBlock x : ParagraphBlock y : xs)      = group $ ParagraphBlock (x ++ y) : xs
+
+group (BlockquoteBlock x : BlockquoteBlock y : xs)    = group $ BlockquoteBlock (x ++ y) : xs
+group (BlockquoteBlock x : y@(ParagraphBlock _) : xs) = group $ BlockquoteBlock (x ++ [y]) : xs
+group (BlockquoteBlock x : xs)                        = BlockquoteBlock (clean x) : group xs
+
+group (UListBlock x : UListBlock y : xs)              = group $ UListBlock (x ++ y) : xs
+group (UListBlock x : BlankLine : UListBlock y : xs)  = group $ UListBlock (x ++ y) : xs
+group (UListBlock x : xs)                             = UListBlock (map clean x) : group xs
+
+group (OListBlock x : OListBlock y : xs)              = group $ OListBlock (x ++ y) : xs
+group (OListBlock x : BlankLine : OListBlock y : xs)  = group $ OListBlock (x ++ y) : xs
+group (OListBlock x : xs)                             = OListBlock (map (second clean) x) : group xs
+
+group (x:xs)                                          = x : group xs
+
+groupIndented :: Doc -> Doc
+groupIndented xs = go 0 [] xs
+  where go blanks xs (BlankLine : zs) = go (blanks + 1) xs zs
+        go blanks xs (IndentedBlock ys : zs) = go 0 (xs ++ replicate blanks T.empty ++ ys) zs
+        go blanks xs zs = (IndentedBlock xs) : group (replicate blanks BlankLine ++ zs)

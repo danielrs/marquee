@@ -32,8 +32,13 @@ writeHtmlDocument title (Just cssFile) md = docTypeHtml $ do
     H.link ! A.rel "stylesheet" ! A.type_ "text/css" ! (A.href . toValue $ cssFile)
   H.body . writeHtml' $ md
 
+writeHtml' :: Markdown -> Html
 writeHtml' []     = return ()
 writeHtml' (x:xs) = writeElement x >> writeHtml' xs
+
+writeNestedHtml :: Markdown -> Html
+writeNestedHtml (x : []) = writeSingleElement x
+writeNestedHtml xs       = writeHtml' xs
 
 writeElement :: MarkdownElement -> Html
 writeElement (ThematicBreak)   = hr
@@ -42,9 +47,13 @@ writeElement (Indented str)    = codeblock "" str
 writeElement (Fenced info str) = codeblock info str
 writeElement (Paragraph x)     = p $ writeInline x
 writeElement (Blockquote x)    = H.blockquote $ writeHtml' x
-writeElement (UnorderedList x) = ul $ forM_ x (li . writeHtml')
-writeElement (OrderedList x)   = ol $ forM_ x (li . writeHtml' . snd)
+writeElement (UnorderedList x) = ul $ forM_ x (li . writeNestedHtml)
+writeElement (OrderedList x)   = ol $ forM_ x (li . writeNestedHtml . snd)
 writeElement _                 = return ()
+
+writeSingleElement :: MarkdownElement -> Html
+writeSingleElement (Paragraph x) = writeInline x
+writeSingleElement x = writeElement x
 
 writeInline :: MarkdownInline -> Html
 writeInline (HardLineBreak)           = br
@@ -60,7 +69,7 @@ writeInline (Cons x y)                = writeInline x >> writeInline y
 writeInline _                         = return ()
 
 codeblock :: T.Text -> T.Text -> Html
-codeblock info xs = codeblock' (T.unpack info) (T.unpack xs)
+codeblock info xs = codeblock' (T.unpack info) (T.unpack $ xs `T.append` "\n")
   where codeblock' :: String -> String -> Html
         codeblock' []   = pre . code . toHtml
         codeblock' info = pre . flip (!) (class_ $ toValue $ "language-" ++ info) . code . toHtml
