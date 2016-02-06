@@ -2,7 +2,7 @@ module Main where
 
 import Text.Marquee
 import System.IO
-import qualified Data.ByteString.Char8 as B
+import qualified Data.Text.IO as T
 
 sourceMarkdown :: String
 sourceMarkdown = "app/minimal.md"
@@ -15,7 +15,7 @@ targetHtml = "app/minimal.html"
 
 main :: IO ()
 main = do
-  markdown <- B.readFile sourceMarkdown
+  markdown <- T.readFile sourceMarkdown
 
   let ast = renderAST markdown
       html = renderHtml . writeHtmlDocument "Minimal" (Just sourceCss) $ ast

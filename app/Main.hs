@@ -6,7 +6,7 @@ import Data.Maybe
 import Data.List (intercalate)
 import Options.Applicative
 import System.IO
-import qualified Data.ByteString as B
+import qualified Data.Text.IO as T
 
 import Text.Marquee
 
@@ -92,7 +92,7 @@ dispatch _ = outputHtml
 
 outputHtml :: Options -> Handle -> Handle -> IO ()
 outputHtml options input output = do
-  markdown <- B.hGetContents input
+  markdown <- T.hGetContents input
 
   let writer =  if htmlPage options
                   then writeHtmlDocument (fromMaybe "" (htmlTitle options)) (htmlCss options)

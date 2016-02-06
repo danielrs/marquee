@@ -1,9 +1,9 @@
 module Text.Marquee.SyntaxTrees.AST where
 
-import Data.ByteString (ByteString(), append, empty)
+import Data.Text (Text(), append, empty)
 import qualified Data.Map as M
 
-import Data.ByteString.Marquee
+import Data.Text.Marquee
 import Text.Marquee.SyntaxTrees.CST as C
 
 type Markdown = [MarkdownElement]
@@ -11,8 +11,8 @@ type Markdown = [MarkdownElement]
 data MarkdownElement  = BlankLine
                         | ThematicBreak
                         | Heading Int MarkdownInline
-                        | Indented [ByteString]
-                        | Fenced ByteString [ByteString]
+                        | Indented Text
+                        | Fenced Text Text
                         | Paragraph MarkdownInline
                         | Blockquote [MarkdownElement]
                         | UnorderedList [Markdown]
@@ -22,13 +22,13 @@ data MarkdownElement  = BlankLine
 data MarkdownInline = NoInline
                       | LineBreak
                       | HardLineBreak
-                      | Text ByteString
+                      | Text Text
                       -- Special
-                      | Codespan ByteString
+                      | Codespan Text
                       | Bold MarkdownInline
                       | Italic MarkdownInline
-                      | Link MarkdownInline ByteString (Maybe ByteString)
-                      | Image MarkdownInline ByteString (Maybe ByteString)
+                      | Link MarkdownInline Text (Maybe Text)
+                      | Image MarkdownInline Text (Maybe Text)
                       -- Cons
                       | Cons MarkdownInline MarkdownInline
                       deriving (Eq, Show)
@@ -66,20 +66,20 @@ softLineBreak = LineBreak
 hardLineBreak :: MarkdownInline
 hardLineBreak = HardLineBreak
 
-text :: ByteString -> MarkdownInline
+text :: Text -> MarkdownInline
 text = Text
 
-codespan :: ByteString -> MarkdownInline
+codespan :: Text -> MarkdownInline
 codespan = Codespan . trim
 
 em :: MarkdownInline -> MarkdownInline
 em (Italic xs) = Bold xs
 em xs = Italic xs
 
-link :: MarkdownInline -> ByteString -> Maybe ByteString -> MarkdownInline
+link :: MarkdownInline -> Text -> Maybe Text -> MarkdownInline
 link = Link
 
-image :: MarkdownInline -> ByteString -> Maybe ByteString -> MarkdownInline
+image :: MarkdownInline -> Text -> Maybe Text -> MarkdownInline
 image = Image
 
 containsLink :: MarkdownInline -> Bool
@@ -87,7 +87,7 @@ containsLink (Link _ _ _) = True
 containsLink (Cons x y) = containsLink x || containsLink y
 containsLink _ = False
 
-plain :: MarkdownInline -> ByteString
+plain :: MarkdownInline -> Text
 plain (Text x)     = x
 plain (Codespan x) = x
 plain (Bold x)     = plain x
@@ -98,15 +98,12 @@ plain _            = empty
 
 -- -- CST to AST
 
-type Link = (ByteString, Maybe ByteString)
-type LinkMap = M.Map ByteString Link
-
-insertLink :: ByteString -> (ByteString, Maybe ByteString) -> LinkMap -> LinkMap
-insertLink = M.insertWith (flip const)
+type Link = (Text, Maybe Text)
+type LinkMap = M.Map Text Link
 
 stripLinkReferences :: C.Doc -> (LinkMap, C.Doc)
 stripLinkReferences = foldr f (M.empty, [])
   where f (LinkReference ref url mtitle) (map, xs) =
-          (insertLink ref (url, mtitle) map, xs)
+          (M.insert ref (url, mtitle) map, xs)
         f x (map, xs) =
           (map, x : xs)

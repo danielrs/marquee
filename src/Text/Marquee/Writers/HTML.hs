@@ -4,7 +4,7 @@ module Text.Marquee.Writers.HTML (renderHtml, writeHtml, writeHtmlDocument) wher
 
 -- Control and Data imports
 import Control.Monad (forM_)
-import qualified Data.ByteString.Char8 as B
+import qualified Data.Text as T
 import Data.List (intercalate)
 
 -- Blaze imports
@@ -59,8 +59,8 @@ writeInline (Image x dest mtitle)     = img ! alt (toValue' . plain $ x) ! src (
 writeInline (Cons x y)                = writeInline x >> writeInline y
 writeInline _                         = return ()
 
-codeblock :: B.ByteString -> [B.ByteString] -> Html
-codeblock info xs = codeblock' (B.unpack info) (B.unpack $ B.intercalate "\n" xs)
+codeblock :: T.Text -> T.Text -> Html
+codeblock info xs = codeblock' (T.unpack info) (T.unpack xs)
   where codeblock' :: String -> String -> Html
         codeblock' []   = pre . code . toHtml
         codeblock' info = pre . flip (!) (class_ $ toValue $ "language-" ++ info) . code . toHtml
@@ -68,8 +68,8 @@ codeblock info xs = codeblock' (B.unpack info) (B.unpack $ B.intercalate "\n" xs
 headings :: [(Int, Html -> Html)]
 headings = [(1, h1), (2, h2), (3, h3), (4, h4), (5, h5), (6, h6)]
 
-toHtml' :: B.ByteString -> Html
-toHtml' = toHtml . B.unpack
+toHtml' :: T.Text -> Html
+toHtml' = toHtml . T.unpack
 
-toValue' :: B.ByteString -> AttributeValue
-toValue' = toValue . B.unpack
+toValue' :: T.Text -> AttributeValue
+toValue' = toValue . T.unpack
