@@ -112,7 +112,22 @@ fenced = do
   where fenceOf c = manyN 3 (char c)
 
 html :: BlockParser DocElement
-html = html1 <|> html2 <|> html3 <|> html4 <|> html5 <|> html6 <|> html7
+html = lift optIndent *> (html1to5 <|> html6 <|> html7)
+  where html1to5 = lift $ do
+          xs <- H.info <|> H.comment <|> H.cdata <|> H.special <|> H.preFormated
+          ys <- takeTill isLineEnding
+          return . C.html $ T.append xs ys
+        html6 = lift $ do
+          xs <- H.simpleTag
+          ys <- tillBlankLine
+          return . C.html $ T.append xs ys
+        html7 = lift $ do
+          xs <- (H.tag <|> H.ctag) <* lookAhead whitespace
+          ys <- tillBlankLine
+          return . C.html $ T.append xs ys
+        tillBlankLine = T.concat <$>  manyTill
+                                      (Atto.takeWhile1 (not .isLineEnding) <|> Atto.take 1)
+                                      (lookAhead $ lineEnding *> emptyLine)
 
 linkRef :: BlockParser DocElement
 linkRef = lift $ do
@@ -155,138 +170,3 @@ headingInline headingSize = do
   xs <- manyTill anyChar (lookAhead end) <* end
   return $ T.pack xs
   where end = lookAhead lineEnding_ <|> linespace *> Atto.takeWhile (== '#') *> next (lookAhead lineEnding_)
-
--- HTML
-
-html1 :: BlockParser DocElement
-html1 = lift $ do
-  optIndent
-  open <- opening
-  xs <- T.singleton <$> (linespace <|> char '>' <|> satisfy isLineEnding)
-  ys <- T.concat <$> manyTill (content) (lookAhead closing)
-  close <- closing
-  return . C.html . T.concat $ [open, xs, ys, close]
-  where opening = string "<script" <|> string "<pre" <|> string "<style"
-        closing = string "</script>" <|> string "</pre>" <|> string "</style>" <|> (endOfInput >> return "")
-        content = Atto.takeWhile1 (/= '<') <|> Atto.take 6
-
-html2 :: BlockParser DocElement
-html2 = lift $ do
-  optIndent
-  open <- opening
-  xs <- T.concat <$> manyTill (Atto.takeWhile1 (/= '-') <|> Atto.take 3) (lookAhead closing)
-  close <- closing
-  return . C.html . T.concat $ [open, xs, close]
-  where opening = string "<!--"
-        closing = string "-->" <|> (endOfInput >> return "")
-
-html3 :: BlockParser DocElement
-html3 = lift $ do
-  optIndent
-  open <- opening
-  xs <- T.concat <$> manyTill (Atto.takeWhile1 (/= '?') <|> Atto.take 2) (lookAhead closing)
-  close <- closing
-  return . C.html . T.concat $ [open, xs, close]
-  where opening = string "<?"
-        closing = string "?>" <|> (endOfInput >> return "")
-
-html4 :: BlockParser DocElement
-html4 = lift $ do
-  optIndent
-  open <- opening
-  xs <- T.concat <$> manyTill (Atto.takeWhile1 (/= '>') <|> Atto.take 1) (lookAhead closing)
-  close <- closing
-  return . C.html . T.concat $ [open, xs, close]
-  where opening = T.snoc <$> string "<!" <*> satisfy (\c -> isLetter c && isUpper c)
-        closing = string ">" <|> (endOfInput >> return "")
-
-html5 :: BlockParser DocElement
-html5 = lift $ do
-  optIndent
-  open <- opening
-  xs <- T.concat <$> manyTill (Atto.takeWhile1 (/= ']') <|> Atto.take 3) (lookAhead closing)
-  close <- closing
-  return . C.html . T.concat $ [open, xs, close]
-  where opening = string "<![CDATA["
-        closing = string "]]>" <|> (endOfInput >> return "")
-
-html6 :: BlockParser DocElement
-html6 = lift $ do
-  optIndent
-  a <- string "</" <|> string "<"
-  b <- choice $ map string tags
-  c <- T.singleton <$> (linespace <|> char '>' <|> satisfy isLineEnding) <|> string "/>"
-  xs <- T.concat
-        <$> manyTill (Atto.takeWhile1 (not . isLineEnding) <|> Atto.take 1) (lookAhead closing)
-  return . C.html $ T.concat [a, b, c, xs]
-  where closing = endOfInput <|> lineEnding >> emptyLine
-
-html7 :: BlockParser DocElement
-html7 = lift $ do
-  optIndent
-  tag <- H.tag <|> H.ctag
-  tag' <- T.singleton <$> lookAhead whitespace
-  xs <- T.concat
-        <$> manyTill (Atto.takeWhile1 (not . isLineEnding) <|> Atto.take 1) (lookAhead closing)
-  return . C.html $ T.concat [tag, tag', xs]
-  where closing = endOfInput <|> lineEnding *> emptyLine
-
-tags :: [Text]
-tags =  ["address"
-        , "article"
-        , "aside"
-        , "base"
-        , "basefont"
-        , "blockquote"
-        , "body"
-        , "caption"
-        , "center"
-        , "col"
-        , "colgroup"
-        , "dd"
-        , "details"
-        , "dialog"
-        , "dir"
-        , "div"
-        , "dl"
-        , "dt"
-        , "fieldset"
-        , "figcaption"
-        , "figure"
-        , "footer"
-        , "form"
-        , "frame"
-        , "frameset"
-        , "h1"
-        , "head"
-        , "header"
-        , "hr"
-        , "html"
-        , "iframe"
-        , "legend"
-        , "li"
-        , "link"
-        , "main"
-        , "menu"
-        , "menuitem"
-        , "meta"
-        , "nav"
-        , "noframes"
-        , "ol"
-        , "optgroup"
-        , "option"
-        , "p"
-        , "param"
-        , "section"
-        , "source"
-        , "summary"
-        , "table"
-        , "tbody"
-        , "td"
-        , "tfoot"
-        , "th"
-        , "thead"
-        , "title"
-        , "tr"
-        , "track"
-        , "ul"]

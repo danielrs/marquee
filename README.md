@@ -8,9 +8,16 @@ I wrote this library for personal usage along with [Yesod][yesod]; however, it c
 
 ### What needs to be done?
 
-The parser follows most of the rules outlined at *CommonMark*, however, some parsing stills needs polishing:
+1. **Optimize** for speed (is not that bad right now, but could be better).
+2. Rewrite/Add code to pass more tests from the official CommonMark testing suite.
 
-1. Raw HTML parsing; nothing implemented until now.
+#### Tests
+
+Marquee passes more than half of [CommonMark tests][test suite]:
+
+    397 passed, 216 failed, 0 errored, 0 skipped
+
+The project would be considered to be *almost* done when all the tests are passed.
 
 ### Structure of the library
 
@@ -61,4 +68,4 @@ Available options:
 [yesod]: http://www.yesodweb.com/
 [minimal]: app/Minimal.hs
 [cli]: app/Main.hs
-
+[test suite]: https://github.com/jgm/CommonMark
