@@ -17,6 +17,7 @@ data DocElement = BlankLine
                   | HeadingUnderline Int Text
                   | IndentedBlock [Text]
                   | Fenced Text [Text]
+                  | HTML Text
                   | ParagraphBlock [Text]
                   | LinkReference Text Text (Maybe Text)
                   -- Container blocks
@@ -44,6 +45,9 @@ indentedBlock = IndentedBlock . (:[])
 
 fenced :: Text -> [Text] -> DocElement
 fenced info = Fenced (trim info)
+
+html :: Text -> DocElement
+html = HTML
 
 paragraphBlock :: Text -> DocElement
 paragraphBlock = ParagraphBlock . (:[])

@@ -35,6 +35,7 @@ fromDocElement linkMap (C.Heading n xs)         = A.Heading n (parseInline linkM
 fromDocElement linkMap (C.HeadingUnderline _ _) = A.ThematicBreak
 fromDocElement linkMap (C.IndentedBlock xs)     = A.Indented (T.intercalate "\n" xs)
 fromDocElement linkMap (C.Fenced info xs)       = A.Fenced info (T.intercalate "\n" xs)
+fromDocElement linkMap (C.HTML xs)              = A.HTML xs
 fromDocElement linkMap (C.ParagraphBlock xs)    = A.Paragraph (parseInline linkMap $ T.intercalate "\n" xs)
 fromDocElement linkMap (C.LinkReference _ _ _)  = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)   = A.Blockquote $ map (fromDocElement linkMap) xs

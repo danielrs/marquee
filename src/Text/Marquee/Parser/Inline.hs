@@ -17,6 +17,7 @@ import Data.Attoparsec.Combinator
 
 import Data.Text.Marquee (trim)
 import Text.Marquee.Parser.Common
+import Text.Marquee.Parser.HTML
 import Text.Marquee.SyntaxTrees.AST (MarkdownInline(..))
 import qualified Text.Marquee.SyntaxTrees.AST as A
 
@@ -60,6 +61,7 @@ inline ignored =
           , em ignored
           , link ignored
           , image ignored
+          , html
           , hardLineBreak
           , softLineBreak
           , escapedChar
@@ -114,8 +116,8 @@ linkInfo = linkInlineInfo <|> linkRefInfo
 
 linkInlineInfo :: InlineParser (Text, Text, Maybe Text)
 linkInlineInfo = lift $ do
-  dest <- char '(' *> skipWhile isWhitespace *> linkDestination
-  title <- skipWhile isWhitespace *> optionMaybe linkTitle <* skipWhile isWhitespace <* char ')'
+  dest <- char '(' *> skipWhile isLinespace *> linkDestination
+  title <- skipWhile isLinespace *> optionMaybe linkTitle <* skipWhile isLinespace <* char ')'
   return $ (T.empty, dest, title)
 
 linkRefInfo :: InlineParser (Text, Text, Maybe Text)
@@ -126,9 +128,14 @@ linkRefInfo = do
     Nothing -> fail $ "Link reference: " ++ T.unpack linkRef ++ ", not found"
     Just (linkUrl, linkTitle) -> return (linkRef, linkUrl, linkTitle)
 
+html :: InlineParser MarkdownInline
+html = lift $ do
+  tag <- tag <|> ctag
+  return $ A.htmlText tag
+
 hardLineBreak :: InlineParser MarkdownInline
 hardLineBreak = lift $
-  ((manyN 2 whitespace *> lineEnding) <|> (char '\\' *> lineEnding)) *> pure A.hardLineBreak
+  ((manyN 2 linespace *> lineEnding) <|> (char '\\' *> lineEnding)) *> pure A.hardLineBreak
 
 softLineBreak :: InlineParser MarkdownInline
 softLineBreak = lift $ lineEnding *> pure A.softLineBreak
@@ -141,7 +148,7 @@ inlineText :: IgnoredChars -> InlineParser MarkdownInline
 inlineText ignored = lift $ do
   x <- satisfy (\c -> not $ isIgnored c ignored)
   xs <- manyTill anyChar
-        (lookAhead $ endOfInput <|> void (oneOf special) <|> manyN 2 whitespace *> lineEnding)
+        (lookAhead $ endOfInput <|> void (oneOf special) <|> manyN 2 linespace *> lineEnding)
   return $ A.text . T.pack $ x:xs
-  where special = "`*_[]!\n\\" :: String
+  where special = "`*_[]!\n\\<" :: String
 

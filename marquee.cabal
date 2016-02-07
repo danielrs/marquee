@@ -35,6 +35,7 @@ library
                         , Text.Marquee.Parser.Common
                         , Text.Marquee.Parser.Block
                         , Text.Marquee.Parser.Inline
+                        , Text.Marquee.Parser.HTML
 
 executable marquee
   main-is: app/Main.hs

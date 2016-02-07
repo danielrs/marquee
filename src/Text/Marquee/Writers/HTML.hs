@@ -45,6 +45,7 @@ writeElement (ThematicBreak)   = hr
 writeElement (Heading n x)     = (lookupOr h4 n headings) $ writeInline x
 writeElement (Indented str)    = codeblock "" str
 writeElement (Fenced info str) = codeblock info str
+writeElement (HTML x)          = preEscapedText x
 writeElement (Paragraph x)     = p $ writeInline x
 writeElement (Blockquote x)    = H.blockquote $ writeHtml' x
 writeElement (UnorderedList x) = ul $ forM_ x (li . writeNestedHtml)
@@ -65,6 +66,7 @@ writeInline (Italic x)                = em $ writeInline x
 writeInline (Link x url Nothing)      = (a $ writeInline x) ! href (toValue' url)
 writeInline (Link x url (Just title)) = (a $ writeInline x) ! href (toValue' url) ! A.title (toValue' title)
 writeInline (Image x dest mtitle)     = img ! alt (toValue' . plain $ x) ! src (toValue' dest)
+writeInline (HTMLText x)              = preEscapedText x
 writeInline (Cons x y)                = writeInline x >> writeInline y
 writeInline _                         = return ()
 

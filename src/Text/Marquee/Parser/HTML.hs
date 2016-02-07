@@ -1,0 +1,69 @@
+{-# LANGUAGE OverloadedStrings #-}
+
+module Text.Marquee.Parser.HTML (tag, ctag) where
+
+import Control.Applicative
+import Control.Monad
+
+import Data.Char (isLetter, isDigit)
+import Data.Text(Text())
+import qualified Data.Text as T
+
+import Data.Attoparsec.Text as Atto
+import Data.Attoparsec.Combinator
+
+import Text.Marquee.Parser.Common
+
+tag :: Parser Text
+tag = do
+  open <- string "<"
+  tname <- tagName
+  tattrs <- T.concat <$> many tagAttribute
+  space <- Atto.takeWhile isWhitespace
+  close <- string "/>" <|> string ">"
+  return $ T.concat [open, tname, tattrs, space, close]
+
+ctag :: Parser Text
+ctag = do
+  open <- string "</"
+  tname <- tagName
+  space <- Atto.takeWhile isWhitespace
+  close <- string ">"
+  return $ T.concat [open, tname, space, close]
+
+tagName :: Parser Text
+tagName = do
+  x <- satisfy isLetter
+  xs <- Atto.takeWhile (\c -> isLetter c || isDigit c || c == '-')
+  return $ T.cons x xs
+
+tagAttribute :: Parser Text
+tagAttribute = do
+  space <- Atto.takeWhile1 isWhitespace
+  name <- attributeName
+  value <- option "" attributeValueSpec
+  return $ T.concat [space, name, value]
+
+
+attributeName :: Parser Text
+attributeName = do
+  x <- satisfy (\c -> isLetter c || c `elem` ("_:" :: String))
+  xs <- Atto.takeWhile (\c -> isLetter c || isDigit c || c  `elem` ("_:.-" :: String))
+  return $ T.cons x xs
+
+attributeValueSpec :: Parser Text
+attributeValueSpec = do
+  space0 <- Atto.takeWhile isWhitespace
+  eq <- string "="
+  space1 <- Atto.takeWhile isWhitespace
+  val <- attributeValue
+  return $ T.concat [space0, eq, space1, val]
+
+attributeValue :: Parser Text
+attributeValue = unquoted <|> quoted '\'' <|> quoted '"'
+  where unquoted = Atto.takeWhile1 (flip notElem ("\"'=<>`" :: String))
+        quoted c = do
+          open <- T.singleton <$> char c
+          xs <- Atto.takeWhile (/= c)
+          close <- T.singleton <$> char c
+          return $ T.concat [open, xs, close]

@@ -13,8 +13,8 @@ data MarkdownElement  = BlankLine
                         | Heading Int MarkdownInline
                         | Indented Text
                         | Fenced Text Text
+                        | HTML Text
                         | Paragraph MarkdownInline
-                        | Inline MarkdownInline
                         | Blockquote [MarkdownElement]
                         | UnorderedList [Markdown]
                         | OrderedList [(Int, Markdown)]
@@ -30,6 +30,7 @@ data MarkdownInline = NoInline
                       | Italic MarkdownInline
                       | Link MarkdownInline Text (Maybe Text)
                       | Image MarkdownInline Text (Maybe Text)
+                      | HTMLText Text
                       -- Cons
                       | Cons MarkdownInline MarkdownInline
                       deriving (Eq, Show)
@@ -82,6 +83,9 @@ link = Link
 
 image :: MarkdownInline -> Text -> Maybe Text -> MarkdownInline
 image = Image
+
+htmlText :: Text -> MarkdownInline
+htmlText = HTMLText
 
 containsLink :: MarkdownInline -> Bool
 containsLink (Link _ _ _) = True

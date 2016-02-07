@@ -21,6 +21,12 @@ lineEnding_ = endOfLine <|> endOfInput
 whitespace :: Parser Char
 whitespace = satisfy isWhitespace
 
+linespace :: Parser Char
+linespace = satisfy isLinespace
+
+emptyLine :: Parser ()
+emptyLine = skipWhile isLinespace >> lineEnding_
+
 optIndent :: Parser String
 optIndent = atMostN 3 (char ' ')
 
@@ -34,7 +40,7 @@ control :: Parser Char
 control = satisfy isControl
 
 next :: Parser a -> Parser a
-next p = skipWhile isWhitespace *> p
+next p = skipWhile isLinespace *> p
 
 escaped :: Char -> Parser Char
 escaped c = char '\\' *> char c
@@ -59,7 +65,9 @@ manyN n p
   | otherwise = liftM2 (++) (count n p) (many p)
 
 atMostN :: Int -> Parser a -> Parser [a]
-atMostN n p = atMostN1 n p <|> return []
+atMostN n p
+  | n <= 0 = count 0 p
+  | otherwise = count n p <|> atMostN (n - 1) p
 
 atMostN1 :: Int -> Parser a -> Parser [a]
 atMostN1 n p
@@ -69,7 +77,10 @@ atMostN1 n p
 -- Useful functions
 
 isWhitespace :: Char -> Bool
-isWhitespace c = isSpace c && c /= '\n'
+isWhitespace c = isSpace c
+
+isLinespace :: Char -> Bool
+isLinespace c = isSpace c && (not . isLineEnding) c
 
 isLineEnding :: Char -> Bool
 isLineEnding c = c == '\n' || c == '\r'
