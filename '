@@ -39,8 +39,8 @@ indentLevel = liftM sum get
 bulletMarker :: Parser Char
 bulletMarker = oneOf "-+*"
 
-orderedMarker :: Parser (String, Char)
-orderedMarker = (,) <$> atMostN1 9 digit <*> oneOf ".)"
+orderedMarker :: Parser String
+orderedMarker = atMostN1 10 digit <* oneOf ".)"
 
 -- Parsing
 
@@ -63,7 +63,7 @@ block = choice [
   ]
 
 indented :: BlockParser DocElement -> BlockParser DocElement
-indented p = indentLevel >>= \level -> count level (lift linespace) >> p
+indented p = blankLine <|> (indentLevel >>= \level -> count level (lift linespace) >> p)
 
 blankLine :: BlockParser DocElement
 blankLine = lift $ next (lookAhead lineEnding_) *> return C.blankLine
@@ -146,32 +146,28 @@ blockquote = C.blockquoteBlock <$> (lift (optIndent *> char '>' *> skipWhile isL
 
 unorderedList :: BlockParser DocElement
 unorderedList = do
-  indent <- lift $ length <$> optIndent
-  marker <- lift bulletMarker
-  spaces <- lift $ T.length <$> takeWhile1 isWhitespace
-  C.unorderedList marker <$> listItem (indent + 1 + spaces)
+  level <- indentLevel
+  indent <- lift $ length <$> optIndent <* bulletMarker
+  spaces <- lift $ T.length <$> takeWhile1 isLinespace
+  C.unorderedList <$> listItem (indent + 1 + spaces)
 
 orderedList :: BlockParser DocElement
 orderedList = do
   indent <- lift $ length <$> optIndent
-  (num, marker) <- lift orderedMarker
-  spaces <- lift $ T.length <$> takeWhile1 isWhitespace
-  C.orderedList marker (read num) <$> listItem (indent + length num + 1 + spaces)
+  num <- lift orderedMarker
+  spaces <- lift $ T.length <$> takeWhile1 isLinespace
+  C.orderedList (read num) <$> listItem (indent + length num + 1 + spaces)
 
 listItem :: Int -> BlockParser Doc
 listItem indentAmount = do
   indent indentAmount
-  level <- indentLevel
   x <- block
-  xs <- concat <$> many (lift lineEnding *> go)
+  xs <- option [] $ manyTill (lift lineEnding *> indented block) (lift $ lookAhead end)
   unindent
   return (x:xs)
-  where go = do
-          x <- optionMaybe $ blankLine <* lift lineEnding
-          y <- indented block
-          case x of
-            Nothing -> return [y]
-            Just x  -> return [x, y]
+  where end = endOfInput <|> lineEnding *> emptyLine *> emptyLine
+        twoBlanks = emptyLine *> emptyLine
+        notIndented = indentLevel >>= \level -> count lineSpace level
 
 rawInline :: Parser Text
 rawInline = Atto.takeTill isLineEnding

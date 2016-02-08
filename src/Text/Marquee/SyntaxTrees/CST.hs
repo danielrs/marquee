@@ -22,8 +22,8 @@ data DocElement = BlankLine
                   | LinkReference Text Text (Maybe Text)
                   -- Container blocks
                   | BlockquoteBlock [DocElement]
-                  | UListBlock [Doc]
-                  | OListBlock [(Int, Doc)]
+                  | UListBlock Char [Doc]
+                  | OListBlock Char [(Int, Doc)]
                   deriving (Eq, Show)
 
 -- CONSTRUCTION FUNCTIONS
@@ -53,16 +53,16 @@ paragraphBlock :: Text -> DocElement
 paragraphBlock = ParagraphBlock . (:[])
 
 linkReference :: Text -> Text -> Maybe Text -> DocElement
-linkReference ref url title = LinkReference (T.toLower . trim $ ref) (trim url) (trim <$> title)
+linkReference ref url title = LinkReference (T.toLower . trim $ ref) (trim url) title
 
 blockquoteBlock :: DocElement -> DocElement
 blockquoteBlock = BlockquoteBlock . (:[])
 
-unorderedList :: Doc -> DocElement
-unorderedList = UListBlock . (:[])
+unorderedList :: Char -> Doc -> DocElement
+unorderedList c = UListBlock c . (:[])
 
-orderedList :: Int -> Doc -> DocElement
-orderedList n = OListBlock . (:[]) . (,) n
+orderedList :: Char -> Int -> Doc -> DocElement
+orderedList c n = OListBlock c . (:[]) . (,) n
 
 -- HELPER FUNCTIONS
 
@@ -94,13 +94,17 @@ group (BlockquoteBlock x : BlockquoteBlock y : xs)    = group $ BlockquoteBlock 
 group (BlockquoteBlock x : y@(ParagraphBlock _) : xs) = group $ BlockquoteBlock (x ++ [y]) : xs
 group (BlockquoteBlock x : xs)                        = BlockquoteBlock (clean x) : group xs
 
-group (UListBlock x : UListBlock y : xs)              = group $ UListBlock (x ++ y) : xs
-group (UListBlock x : BlankLine : UListBlock y : xs)  = group $ UListBlock (x ++ y) : xs
-group (UListBlock x : xs)                             = UListBlock (map clean x) : group xs
+group (UListBlock a x : UListBlock b y : xs)
+  | a == b                                               = group $ UListBlock a (x ++ y) : xs
+group (UListBlock a x : BlankLine : UListBlock b y : xs)
+  | a == b                                               = group $ UListBlock a (x ++ y) : xs
+group (UListBlock a x : xs)                              = UListBlock a (map clean x) : group xs
 
-group (OListBlock x : OListBlock y : xs)              = group $ OListBlock (x ++ y) : xs
-group (OListBlock x : BlankLine : OListBlock y : xs)  = group $ OListBlock (x ++ y) : xs
-group (OListBlock x : xs)                             = OListBlock (map (second clean) x) : group xs
+group (OListBlock a x : OListBlock b y : xs)
+  | a == b                                               = group $ OListBlock a (x ++ y) : xs
+group (OListBlock a x : BlankLine : OListBlock b y : xs)
+  | a == b                                               = group $ OListBlock a (x ++ y) : xs
+group (OListBlock a x : xs)                                = OListBlock a (map (second clean) x) : group xs
 
 group (x:xs)                                          = x : group xs
 

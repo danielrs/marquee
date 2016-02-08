@@ -6,7 +6,7 @@ import Control.Applicative
 import Control.Monad
 import Control.Monad.State (StateT(..), get, modify, lift)
 
-import Data.Char (isPunctuation, isSymbol)
+import Data.Char (isAlphaNum, isControl, isDigit, isLetter, isPunctuation, isSymbol)
 import Data.Text (Text())
 import qualified Data.Text as T
 import qualified Data.Map as M (lookup)
@@ -61,6 +61,7 @@ inline ignored =
           , em ignored
           , link ignored
           , image ignored
+          , autolink
           , html
           , hardLineBreak
           , softLineBreak
@@ -127,6 +128,32 @@ linkRefInfo = do
   case mlink of
     Nothing -> fail $ "Link reference: " ++ T.unpack linkRef ++ ", not found"
     Just (linkUrl, linkTitle) -> return (linkRef, linkUrl, linkTitle)
+
+-- TODO: Write valid email address parser
+autolink :: InlineParser MarkdownInline
+autolink = lift $ do
+  char '<'
+  (url, label) <- absoluteUri <|> emailUri
+  char '>'
+  return $ A.link (A.text label) url Nothing
+  where absoluteUri = do
+          xs <- scheme
+          y <- char ':'
+          ys <- Atto.takeWhile (\c -> not $ isWhitespace c || isControl c || c `elem` ("<>" :: String))
+          let url = T.append xs (T.cons y ys)
+          return (url, url)
+        scheme = do
+          x <- satisfy isLetter
+          xs <- Atto.takeWhile1 (\c -> isLetter c || isDigit c || c `elem` ("+.-" :: String))
+          return $ T.cons x xs
+        emailUri = do
+          stitch
+            <$> takeWhile1 (\c -> not $ c `elem` ("@<>" :: String))
+            <*> char '@'
+            <*> takeWhile1 (\c -> not $ c `elem` ("@<>" :: String))
+        stitch local at server =
+          let email = T.concat [local, T.singleton at, server]
+          in (T.append "mailto:" email, email)
 
 html :: InlineParser MarkdownInline
 html = lift $ do

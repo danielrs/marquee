@@ -39,5 +39,5 @@ fromDocElement linkMap (C.HTML xs)              = A.HTML xs
 fromDocElement linkMap (C.ParagraphBlock xs)    = A.Paragraph (parseInline linkMap $ T.intercalate "\n" xs)
 fromDocElement linkMap (C.LinkReference _ _ _)  = A.BlankLine
 fromDocElement linkMap (C.BlockquoteBlock xs)   = A.Blockquote $ map (fromDocElement linkMap) xs
-fromDocElement linkMap (C.UListBlock xs)        = A.UnorderedList $ map (fromDoc linkMap) xs
-fromDocElement linkMap (C.OListBlock xs)        = A.OrderedList $ map (second $ fromDoc linkMap) xs
+fromDocElement linkMap (C.UListBlock _ xs)      = A.UnorderedList $ map (fromDoc linkMap) xs
+fromDocElement linkMap (C.OListBlock _ xs)      = A.OrderedList $ map (second $ fromDoc linkMap) xs

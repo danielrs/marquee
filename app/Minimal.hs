@@ -17,11 +17,12 @@ main :: IO ()
 main = do
   markdown <- T.readFile sourceMarkdown
 
-  let ast = renderAST markdown
+  let cst = renderCST markdown
+      ast = renderAST markdown
       html = renderHtml . writeHtmlDocument "Minimal" (Just sourceCss) $ ast
 
   putStrLn "\n-- GENERATED AST --\n"
-  mapM_ (putStrLn . show) ast
+  mapM_ (putStrLn . show) cst
   putStrLn "\n-- END OF AST --\n"
 
   writeFile targetHtml html

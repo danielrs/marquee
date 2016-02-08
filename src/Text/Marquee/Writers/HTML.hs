@@ -49,7 +49,10 @@ writeElement (HTML x)          = preEscapedText x
 writeElement (Paragraph x)     = p $ writeInline x
 writeElement (Blockquote x)    = H.blockquote $ writeHtml' x
 writeElement (UnorderedList x) = ul $ forM_ x (li . writeNestedHtml)
-writeElement (OrderedList x)   = ol $ forM_ x (li . writeNestedHtml . snd)
+writeElement (OrderedList x)
+  | first /= 1                 = ol ! start (toValue first)  $ forM_ x (li . writeNestedHtml . snd)
+  | otherwise                  = ol $ forM_ x (li . writeNestedHtml . snd)
+  where first = fst . Prelude.head $ x
 writeElement _                 = return ()
 
 writeSingleElement :: MarkdownElement -> Html
@@ -59,13 +62,13 @@ writeSingleElement x = writeElement x
 writeInline :: MarkdownInline -> Html
 writeInline (HardLineBreak)           = br
 writeInline (LineBreak)               = toHtml (" " :: String)
-writeInline (Text x)                  = toHtml' x
-writeInline (Codespan x)              = code . toHtml' $ x
+writeInline (Text x)                  = H.text x
+writeInline (Codespan x)              = code . H.text $ x
 writeInline (Bold x)                  = strong $ writeInline x
 writeInline (Italic x)                = em $ writeInline x
-writeInline (Link x url Nothing)      = (a $ writeInline x) ! href (toValue' url)
-writeInline (Link x url (Just title)) = (a $ writeInline x) ! href (toValue' url) ! A.title (toValue' title)
-writeInline (Image x dest mtitle)     = img ! alt (toValue' . plain $ x) ! src (toValue' dest)
+writeInline (Link x url Nothing)      = (a $ writeInline x) ! href (textValue url)
+writeInline (Link x url (Just title)) = (a $ writeInline x) ! href (textValue url) ! A.title (textValue title)
+writeInline (Image x dest mtitle)     = img ! alt (textValue . plain $ x) ! src (textValue dest)
 writeInline (HTMLText x)              = preEscapedText x
 writeInline (Cons x y)                = writeInline x >> writeInline y
 writeInline _                         = return ()
@@ -78,9 +81,3 @@ codeblock info xs = codeblock' (T.unpack info) (T.unpack $ xs `T.append` "\n")
 
 headings :: [(Int, Html -> Html)]
 headings = [(1, h1), (2, h2), (3, h3), (4, h4), (5, h5), (6, h6)]
-
-toHtml' :: T.Text -> Html
-toHtml' = toHtml . T.unpack
-
-toValue' :: T.Text -> AttributeValue
-toValue' = toValue . T.unpack

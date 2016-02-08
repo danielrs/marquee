@@ -25,7 +25,7 @@ linespace :: Parser Char
 linespace = satisfy isLinespace
 
 emptyLine :: Parser ()
-emptyLine = skipWhile isLinespace >> lineEnding_
+emptyLine = skipWhile isLinespace *> lineEnding_
 
 optIndent :: Parser String
 optIndent = atMostN 3 (char ' ')
@@ -56,13 +56,16 @@ noneOf cs = satisfy (\c -> c `notElem` cs)
 between :: Parser open -> Parser close -> Parser a -> Parser a
 between open close p = open *> p <* close
 
-optionMaybe :: Parser a -> Parser (Maybe a)
+optionMaybe :: Alternative f => f a -> f (Maybe a)
 optionMaybe p = option Nothing $ Just <$> p
 
 manyN :: Int -> Parser a -> Parser [a]
 manyN n p
   | n <= 0 = return []
   | otherwise = liftM2 (++) (count n p) (many p)
+
+manyTill1 :: Alternative f => f a -> f b -> f [a]
+manyTill1 p end = liftA2 (:) p (manyTill p end)
 
 atMostN :: Int -> Parser a -> Parser [a]
 atMostN n p

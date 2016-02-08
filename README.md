@@ -15,7 +15,7 @@ I wrote this library for personal usage along with [Yesod][yesod]; however, it c
 
 Marquee passes more than half of [CommonMark tests][test suite]:
 
-    397 passed, 216 failed, 0 errored, 0 skipped
+    426 passed, 187 failed, 0 errored, 0 skipped
 
 The project would be considered to be *almost* done when all the tests are passed.
 
