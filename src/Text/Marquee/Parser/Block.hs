@@ -98,7 +98,10 @@ fenced = do
   indentLen <- (+) <$> indentLevel <*> (length <$> lift optIndent)
   lift $ do
     fence <- fenceOf '`' <|> fenceOf '~'
-    infoString <-  Atto.takeTill (\c -> c == '`' || isLineEnding c) <* lineEnding
+    infoString <-  T.pack <$>
+                    manyTill (escaped <|> anyChar)
+                    (lookAhead $ void (char '`') <|> lineEnding)
+                    <* lineEnding
     let fenceIndent  = atMostN indentLen (char ' ')
         closingFence = fenceIndent *> optIndent *> manyN (length fence) (char $ head fence)
 

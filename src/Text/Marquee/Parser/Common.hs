@@ -1,9 +1,11 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Text.Marquee.Parser.Common where
 
 import Control.Applicative
 import Control.Monad
 
-import Data.Char (isControl, isPunctuation, isSpace)
+import Data.Char (isControl, isPunctuation, isSpace, isSymbol)
 import Data.Text (Text())
 import qualified Data.Text as T
 
@@ -42,8 +44,11 @@ control = satisfy isControl
 next :: Parser a -> Parser a
 next p = skipWhile isLinespace *> p
 
-escaped :: Char -> Parser Char
-escaped c = char '\\' *> char c
+escape :: Char -> Parser Char
+escape c = char '\\' *> char c
+
+escaped :: Parser Char
+escaped = char '\\' *> satisfy (\c -> isPunctuation c || isSymbol c)
 
 oneOf :: [Char] -> Parser Char
 oneOf cs = satisfy (\c -> c `elem` cs)
@@ -94,21 +99,25 @@ isPrintable = not . isSpace
 -- Doubt
 
 linkLabel :: Parser Text
-linkLabel = T.pack <$> between (char '[') (char ']') (many1 $ escaped '[' <|> escaped ']' <|> noneOf "[]")
-
--- linkDestination :: Parser Text
--- linkDestination = Atto.takeWhile1 (\c -> not $ isSpace c || isControl c || c == '(' || c == ')')
+linkLabel = T.pack <$> between (char '[') (char ']') (many1 $ escape '[' <|> escape ']' <|> noneOf "[]")
 
 linkDestination :: Parser Text
 linkDestination =
-  T.pack <$>
-  between (char '<') (char '>') (many $ escaped '<' <|> escaped '>' <|> noneOf "<>")
+  T.pack <$> between (char '<') (char '>') (many betweenChar)
   <|>
-  takeWhile1 (\c -> not $ isSpace c || isControl c)
+  T.concat <$> many (destText <|> parens)
+  where destText = T.pack <$> many1 destChar
+        parens   = do
+          open <- string "("
+          content <- destText <|> return ""
+          close <- string ")"
+          return $ T.concat [open, content, close]
+        betweenChar = escaped <|> satisfy (\c -> not $ isWhitespace c || c  == '<' || c == '>')
+        destChar    = escaped <|> satisfy (\c -> not $ isWhitespace c || isControl c || c == '(' || c == ')')
 
 linkTitle :: Parser Text
 linkTitle = titleOf '"' '"' <|> titleOf '\'' '\'' <|> titleOf '(' ')'
   where titleOf :: Char -> Char -> Parser Text
         titleOf open close =
           T.pack <$>
-          between (char open) (char close) (many $ escaped open <|> escaped close <|> noneOf [open, close])
+          between (char open) (char close) (many $ escape open <|> escape close <|> noneOf [open, close])

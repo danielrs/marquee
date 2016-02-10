@@ -61,6 +61,7 @@ inline ignored =
           , em ignored
           , link ignored
           , image ignored
+          , brackets ignored
           , autolink
           , html
           , hardLineBreak
@@ -117,7 +118,7 @@ linkInfo = linkInlineInfo <|> linkRefInfo
 
 linkInlineInfo :: InlineParser (Text, Text, Maybe Text)
 linkInlineInfo = lift $ do
-  dest <- char '(' *> skipWhile isLinespace *> linkDestination
+  dest <- char '(' *> skipWhile isLinespace *> option "" linkDestination
   title <- skipWhile isLinespace *> optionMaybe linkTitle <* skipWhile isLinespace <* char ')'
   return $ (T.empty, dest, title)
 
@@ -128,6 +129,13 @@ linkRefInfo = do
   case mlink of
     Nothing -> fail $ "Link reference: " ++ T.unpack linkRef ++ ", not found"
     Just (linkUrl, linkTitle) -> return (linkRef, linkUrl, linkTitle)
+
+brackets :: IgnoredChars -> InlineParser MarkdownInline
+brackets ignored = do
+  start <- A.text <$> lift (string "[")
+  content <- inline $ ignored <+> ']'
+  end <- A.text <$> lift (string "]")
+  return $ A.cons start (A.cons content end)
 
 -- TODO: Write valid email address parser
 autolink :: InlineParser MarkdownInline
