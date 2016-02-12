@@ -56,7 +56,54 @@ oneOf cs = satisfy (\c -> c `elem` cs)
 noneOf :: [Char] -> Parser Char
 noneOf cs = satisfy (\c -> c `notElem` cs)
 
+linkLabel :: Parser Text
+linkLabel = between (char '[') (char ']') (takeEscapedWhile (`elem` escapable) (`notElem` escapable))
+  where escapable = "[]" :: String
+
+linkDestination :: Parser Text
+linkDestination =
+  between (char '<') (char '>') takeBetween
+  <|>
+  T.concat <$> many1 (takeDest <|> parens)
+  where parens   = do
+          open <- string "("
+          content <- takeDest <|> return ""
+          close <- string ")"
+          return $ T.concat [open, content, close]
+        takeBetween = takeEscapedWhile
+                      (\c -> isPunctuation c || isSymbol c)
+                      (\c -> not $ isWhitespace c || c == '<' || c == '>')
+        takeDest    = takeEscapedWhile1
+                      (\c -> isPunctuation c || isSymbol c)
+                      (\c -> not $ isWhitespace c || isControl c || c == '(' || c == ')')
+
+linkTitle :: Parser Text
+linkTitle = titleOf '"' '"' <|> titleOf '\'' '\'' <|> titleOf '(' ')'
+  where titleOf :: Char -> Char -> Parser Text
+        titleOf open close =
+          between
+            (char open)
+            (char close)
+            (takeEscapedWhile (`elem` escapable) (`notElem` escapable))
+          where escapable = [open, close]
+
 -- Combinators
+
+takeEscapedWhile :: (Char -> Bool) -> (Char -> Bool) -> Parser Text
+takeEscapedWhile x y = takeEscapedWhile1 x y <|> pure ""
+
+takeEscapedWhile1 :: (Char -> Bool) -> (Char -> Bool) -> Parser Text
+takeEscapedWhile1 isEscapable while = do
+  x <- normal1 <|> escaped
+  xs <- many escaped
+  return $ T.concat (x:xs)
+  where isValid c = c /= '\\' && while c
+        normal    = Atto.takeWhile isValid
+        normal1   = Atto.takeWhile1 isValid
+        escaped   = do
+          x <- (char '\\' *> satisfy isEscapable) <|> char '\\'
+          xs <- normal
+          return $ T.cons x xs
 
 between :: Parser open -> Parser close -> Parser a -> Parser a
 between open close p = open *> p <* close
@@ -95,29 +142,3 @@ isLineEnding c = c == '\n' || c == '\r'
 
 isPrintable :: Char -> Bool
 isPrintable = not . isSpace
-
--- Doubt
-
-linkLabel :: Parser Text
-linkLabel = T.pack <$> between (char '[') (char ']') (many1 $ escape '[' <|> escape ']' <|> noneOf "[]")
-
-linkDestination :: Parser Text
-linkDestination =
-  T.pack <$> between (char '<') (char '>') (many betweenChar)
-  <|>
-  T.concat <$> many (destText <|> parens)
-  where destText = T.pack <$> many1 destChar
-        parens   = do
-          open <- string "("
-          content <- destText <|> return ""
-          close <- string ")"
-          return $ T.concat [open, content, close]
-        betweenChar = escaped <|> satisfy (\c -> not $ isWhitespace c || c  == '<' || c == '>')
-        destChar    = escaped <|> satisfy (\c -> not $ isWhitespace c || isControl c || c == '(' || c == ')')
-
-linkTitle :: Parser Text
-linkTitle = titleOf '"' '"' <|> titleOf '\'' '\'' <|> titleOf '(' ')'
-  where titleOf :: Char -> Char -> Parser Text
-        titleOf open close =
-          T.pack <$>
-          between (char open) (char close) (many $ escape open <|> escape close <|> noneOf [open, close])

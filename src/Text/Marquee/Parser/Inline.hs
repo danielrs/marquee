@@ -186,4 +186,3 @@ inlineText ignored = lift $ do
         (lookAhead $ endOfInput <|> void (oneOf special) <|> manyN 2 linespace *> lineEnding)
   return $ A.text . T.pack $ x:xs
   where special = "`*_[]!\n\\<" :: String
-
