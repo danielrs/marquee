@@ -1,5 +1,5 @@
 <!DOCTYPE HTML>
-<html><head><title>Minimal</title><link rel="stylesheet" type="text/css" href="minimal.css"></head><body><p><strong>NOTE</strong>: Markdown taken from <a href="http://assemble.io/docs/Cheatsheet-Markdown.html" title="Source">here</a></p><p>this is <a href="#go">follow me</a></p><h1>Typography</h1><h2>Headings</h2><p>Headings from <code>h1</code> through <code>h6</code> are constructed with a <code>#</code> for each level:</p><pre><code class="language-markdown"># h1 Heading
+<html><head><title>Minimal</title><link rel="stylesheet" type="text/css" href="minimal.css"></head><body><p><strong>NOTE</strong>: Markdown taken from <a href="http://assemble.io/docs/Cheatsheet-Markdown.html" title="Source">here</a></p><h1>Typography</h1><h2>Headings</h2><p>Headings from <code>h1</code> through <code>h6</code> are constructed with a <code>#</code> for each level:</p><pre><code class="language-markdown"># h1 Heading
 ## h2 Heading
 ### h3 Heading
 #### h4 Heading
@@ -206,7 +206,7 @@ grunt.initConfig({
 </code></pre><p>| Option | Description | | ------:| -----------:| | data   | path to data files to supply the data that will be passed into templates. | | engine | engine to be used for processing templates. Handlebars is the default. | | ext    | extension to be used for dest files. |</p><br>
 <br>
 <br><h2>Links</h2><h3>Basic link</h3><pre><code class="language-markdown">[Assemble](http://assemble.io)
-</code></pre><p>Renders to (hover over the link, there is no tooltip):</p><p>[Assemble](http://assemble.io)</p><p>HTML:</p><pre><code class="language-html">&lt;a href=&quot;http://assemble.io&quot;&gt;Assemble&lt;/a&gt;
+</code></pre><p>Renders to (hover over the link, there is no tooltip):</p><p><a href="http://assemble.io">Assemble</a></p><p>HTML:</p><pre><code class="language-html">&lt;a href=&quot;http://assemble.io&quot;&gt;Assemble&lt;/a&gt;
 </code></pre><h3>Add a title</h3><pre><code class="language-markdown">[Upstage](https://github.com/upstage/ &quot;Visit Upstage!&quot;)
 </code></pre><p>Renders to (hover over the link, there should be a tooltip):</p><p><a href="https://github.com/upstage/" title="Visit Upstage!">Upstage</a></p><p>HTML:</p><pre><code class="language-html">&lt;a href=&quot;https://github.com/upstage/&quot; title=&quot;Visit Upstage!&quot;&gt;Upstage&lt;/a&gt;
 </code></pre><h3>Named Anchors</h3><p>Named anchors enable you to jump to the specified anchor point on the same page. For example, each of these chapters:</p><pre><code class="language-markdown"># Table of Contents
@@ -224,7 +224,7 @@ Content for chapter one.
 </code></pre><p><strong>NOTE</strong> that specific placement of the anchor tag seems to be arbitrary. They are placed inline here since it seems to be unobtrusive, and it works.</p><br>
 <br>
 <br><h2>Images</h2><p>Images have a similar syntax to links but include a preceding exclamation point.</p><pre><code class="language-markdown">![Minion](http://octodex.github.com/images/minion.png)
-</code></pre><p>![Minion](http://octodex.github.com/images/minion.png)</p><p>or</p><pre><code class="language-markdown">![Alt text](http://octodex.github.com/images/stormtroopocat.jpg &quot;The Stormtroopocat&quot;)
+</code></pre><p><img alt="Minion" src="http://octodex.github.com/images/minion.png"></p><p>or</p><pre><code class="language-markdown">![Alt text](http://octodex.github.com/images/stormtroopocat.jpg &quot;The Stormtroopocat&quot;)
 </code></pre><p><img alt="Alt text" src="http://octodex.github.com/images/stormtroopocat.jpg"></p><p>Like links, Images also have a footnote style syntax</p><pre><code class="language-markdown">![Alt text][id]
-</code></pre><p><img alt="Alt text" src="http://octodex.github.com/images/dojocat.jpg"></p><p>With a reference later in the document defining the URL location:</p><div id="go" /><pre><code>[id]: http://octodex.github.com/images/dojocat.jpg  &quot;The Dojocat&quot;
+</code></pre><p><img alt="Alt text" src="http://octodex.github.com/images/dojocat.jpg"></p><p>With a reference later in the document defining the URL location:</p><pre><code>[id]: http://octodex.github.com/images/dojocat.jpg  &quot;The Dojocat&quot;
 </code></pre></body></html>

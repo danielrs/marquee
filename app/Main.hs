@@ -4,11 +4,13 @@ module Main where
 
 import Data.Maybe
 import Data.List (intercalate)
-import Options.Applicative
 import System.IO
 import qualified Data.Text.IO as T
 
-import Text.Marquee
+import Data.Semigroup((<>))
+import Options.Applicative
+
+import Lib
 
 -- Options
 

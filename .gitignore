@@ -1,4 +1,5 @@
 *.swp
+.stack-work/
 .cabal-sandbox/
 cabal.sandbox.config
 
